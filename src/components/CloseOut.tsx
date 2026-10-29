@@ -27,9 +27,9 @@ export default function CloseOut({ item, day, onDone }: { item: Row; day: string
   return (
     <div className="panel">
       <strong style={{ fontSize: 15 }}>What happened?</strong>
-      <div className="grid3">
+      <div className="pills">
         {OUTCOMES.map(([k, l]) => (
-          <button key={k} className="pill" style={{ padding: 0 }} aria-pressed={outcome === k} onClick={() => setOutcome(k)}>{l}</button>
+          <button key={k} className="pill" style={{ flex: '1 1 auto' }} aria-pressed={outcome === k} onClick={() => setOutcome(k)}>{l}</button>
         ))}
       </div>
       <label className="field">
