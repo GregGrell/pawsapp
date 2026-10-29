@@ -10,7 +10,10 @@ function keyBytes(b64: string) {
 }
 
 export async function enablePush(userId: string) {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('This browser does not support notifications. Open PAWSapp in Chrome and install it.');
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone = (navigator as any).standalone || matchMedia('(display-mode: standalone)').matches;
+  if (ios && !standalone) throw new Error('On iPhone, first tap Share → Add to Home Screen, then open PAWSapp from the new icon and turn reminders on there.');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('This browser does not support notifications. On Android use Chrome; on iPhone add PAWSapp to the Home Screen first.');
   const perm = await Notification.requestPermission();
   if (perm !== 'granted') throw new Error('Notifications are blocked. Allow them in Chrome site settings.');
   const reg = await navigator.serviceWorker.ready;
@@ -55,7 +58,7 @@ export default function Notifications() {
       </section>
       <section className="card">
         <h2 className="h">If reminders arrive late</h2>
-        <span className="t14">Some Android phones delay notifications to save battery. In the phone's Settings → Apps → Chrome → Battery, choose <b>Unrestricted</b>. Install PAWSapp from Chrome's menu → <b>Add to Home screen</b> (or "Install app") so it opens like a normal app.</span>
+        <span className="t14">Some Android phones delay notifications to save battery. On Android: Settings → Apps → Chrome → Battery → <b>Unrestricted</b>, and install PAWSapp from Chrome's menu → <b>Add to Home screen</b>. On iPhone: in Safari tap <b>Share → Add to Home Screen</b>, then always open PAWSapp from that icon.</span>
       </section>
     </Page>
   );
