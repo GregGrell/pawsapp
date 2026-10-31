@@ -4,6 +4,8 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
+  // Older iPhones (iOS 15+) and Android Chrome 100+
+  build: { target: ['es2020', 'safari15', 'chrome100'] },
   plugins: [
     react(),
     VitePWA({

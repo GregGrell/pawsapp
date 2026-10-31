@@ -5,9 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#006092" />
     <meta name="description" content="Daily hub for the PAWS Rescue Qatar shelter team" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PAWSapp" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" type="image/png" href="./icon-192.png" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <title>PAWSapp</title>
+    <script>
+      // If the app can't start, show why instead of a blank page.
+      (function () {
+        var errors = [];
+        function show(reason) {
+          var root = document.getElementById('root');
+          if (!root || root.childElementCount) return;
+          root.innerHTML =
+            '<div style="font-family:system-ui,sans-serif;padding:32px 20px;max-width:480px;margin:0 auto;color:#17201C">' +
+            '<h1 style="font-size:22px;margin:0 0 8px">PAWSapp couldn\'t start</h1>' +
+            '<p style="color:#4F5A55;margin:0 0 16px">Please screenshot this and send it to Carl.</p>' +
+            '<pre style="white-space:pre-wrap;word-break:break-word;background:#F4F6F5;border:1px solid #E1E6E3;border-radius:10px;padding:12px;font-size:12px">' +
+            String(reason).replace(/</g, '&lt;') + '\n\n' + navigator.userAgent.replace(/</g, '&lt;') + '</pre>' +
+            '<button onclick="location.reload()" style="margin-top:16px;width:100%;min-height:48px;border:0;border-radius:12px;background:#006092;color:#fff;font-size:16px;font-weight:700">Reload</button>' +
+            '</div>';
+        }
+        window.addEventListener('error', function (e) {
+          errors.push((e.message || 'Error') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno + ':' + e.colno : ''));
+          setTimeout(function () { show(errors.join('\n')); }, 300);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          errors.push('Promise: ' + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason));
+        });
+        setTimeout(function () { show(errors.length ? errors.join('\n') : 'The app did not load within 10 seconds.'); }, 10000);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
