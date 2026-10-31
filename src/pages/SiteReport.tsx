@@ -9,6 +9,7 @@ export default function SiteReport() {
   const { isMgmt } = useAuth();
   const { list } = useProfiles();
   const events = useTable('site_presence');
+  const ooh = useTable('out_of_hours');
   const d = today();
   const thisWeek = addDays(d, -weekday(d));
   const [week, setWeek] = useState(thisWeek);
@@ -28,9 +29,11 @@ export default function SiteReport() {
       const trips = events
         .filter((e) => e.user_id === p.id && e.event === 'out' && Date.parse(e.at) >= from && Date.parse(e.at) < to)
         .sort((a, b) => a.at.localeCompare(b.at));
-      return { p, ss, byDay, total, trips, missing: ss.filter((s) => s.missingOut).length };
+      const tilList = ooh.filter((o) => o.user_id === p.id && o.status === 'counted' && o.work_on >= week && o.work_on < addDays(week, 7));
+      const til = tilList.reduce((n, o) => n + o.til_minutes, 0);
+      return { p, ss, byDay, total, trips, tilList, til, missing: ss.filter((s) => s.missingOut).length };
     })
-    .filter((r) => r.total > 0 || r.p.role === 'staff')
+    .filter((r) => r.total > 0 || r.til > 0 || r.p.role === 'staff')
     .sort((a, b) => b.total - a.total);
 
   const exportCsv = () => {
@@ -41,7 +44,9 @@ export default function SiteReport() {
         const day = today(new Date(s.start));
         lines.push([r.p.full_name, day, timeOf(new Date(s.start).toISOString()), s.open ? 'still on site' : timeOf(new Date(s.end).toISOString()), (Math.round(((s.end - s.start) / 3600000) * 100) / 100).toFixed(2), s.missingOut ? 'No sign-out recorded (counted to 22:00)' : ''].map(esc).join(','));
       }
-    for (const r of rows) lines.push([r.p.full_name, 'WEEK TOTAL', '', '', (Math.round((r.total / 3600000) * 100) / 100).toFixed(2), ''].map(esc).join(','));
+    for (const r of rows) for (const o of r.tilList) lines.push([r.p.full_name, o.work_on, o.start_time.slice(0, 5), o.end_time.slice(0, 5), (o.til_minutes / 60).toFixed(2), `Out of hours (TIL): ${o.reason}`].map(esc).join(','));
+    for (const r of rows) lines.push([r.p.full_name, 'WEEK TOTAL ON SITE', '', '', (Math.round((r.total / 3600000) * 100) / 100).toFixed(2), ''].map(esc).join(','));
+    for (const r of rows) lines.push([r.p.full_name, 'WEEK TIL ACCRUED', '', '', (r.til / 60).toFixed(2), ''].map(esc).join(','));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
     a.download = `time-on-site_${week}.csv`;
@@ -81,6 +86,9 @@ export default function SiteReport() {
               );
             })}
           </div>
+          {r.til > 0 && (
+            <span className="t14"><b>+{hhmm(r.til * 60000)} TIL</b> out of hours · {r.tilList.map((o) => `${shortDate(o.work_on).slice(0, 3)} ${o.start_time.slice(0, 5)}–${o.end_time.slice(0, 5)} ${o.reason}`).join(' · ')}</span>
+          )}
           {r.missing > 0 && <span className="warn">{r.missing} day{r.missing > 1 ? 's' : ''} with no sign-out — counted to 22:00</span>}
           {r.trips.length > 0 && (
             <button className="btn link sm" style={{ alignSelf: 'flex-start', padding: 0, color: 'var(--blue)' }} onClick={() => setOpen(open === r.p.id ? null : r.p.id)}>
