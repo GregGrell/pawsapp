@@ -72,6 +72,7 @@ function queries(userId: string, isMgmt: boolean) {
     appointment_outcomes: () => supabase.from('appointment_outcomes').select('*').gte('occurs_on', since30),
     requests: () => supabase.from('requests').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     request_replies: () => supabase.from('request_replies').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at'),
+    site_presence: () => supabase.from('site_presence').select('*').gte('at', `${addDays(d, -63)}T00:00:00+03:00`).order('at'),
     maintenance_issues: () => supabase.from('maintenance_issues').select('*').or(`status.neq.fixed,updated_at.gte.${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     incidents: () => supabase.from('incidents').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     leave_requests: () => supabase.from('leave_requests').select('*').gte('end_on', addDays(d, -90)).order('start_on'),
@@ -270,7 +271,7 @@ let timer: any = null;
 function startRealtime() {
   if (channel) return;
   channel = supabase.channel('paws-live');
-  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues'];
+  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence'];
   live.forEach((t) =>
     channel!.on('postgres_changes' as any, { event: '*', schema: 'public', table: t }, () => {
       pending.add(t);

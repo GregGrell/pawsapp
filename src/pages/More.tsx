@@ -41,6 +41,7 @@ export default function More() {
       {isMgmt && (
         <section className="card menu">
           <span className="sect h">Management settings</span>
+          <Item to="/site-report" icon="clock" tint="var(--line-2)" color="var(--ink-2)" label="Time on site" sub="Weekly hours per person, CSV export" />
           <Item to="/staff" icon="people" tint="var(--line-2)" color="var(--ink-2)" label="Staff & permissions" sub="Approve new accounts, set roles" badge={pendingStaff} />
           <Item to="/kennels" icon="home2" tint="var(--line-2)" color="var(--ink-2)" label="Kennels & animals" sub="Kennel numbers, animals, meds, vaccines" />
           <Item to="/eod-settings" icon="settings" tint="var(--line-2)" color="var(--ink-2)" label="End-of-day checklist" sub="Edit the checks staff tick each evening" />

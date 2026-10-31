@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { SyncBadge } from '../App';
 import KennelLog from '../components/KennelLog';
+import { SiteStatus, TeamStatus } from '../components/SiteStatus';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
 import { Empty, Icon, PhotoPicker, StoredImage, toast } from '../components/ui';
@@ -62,6 +63,9 @@ export default function Today() {
       </header>
 
       <main className="main">
+        {isMgmt && <TeamStatus />}
+        <SiteStatus />
+
         {isMgmt &&
           openIncidents.map((i) => (
             <section key={i.id} className="banner red" aria-label="Incident alert">
