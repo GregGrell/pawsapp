@@ -3,7 +3,9 @@ import { useAuth } from '../auth';
 import { Empty, Icon, Page, toast } from '../components/ui';
 import { useTable } from '../lib/hooks';
 import { insert, update, type Row } from '../lib/store';
-import { shortDate, today } from '../lib/time';
+import { shortDate, timeOf, today } from '../lib/time';
+import { supabase } from '../lib/supabase';
+import { refresh } from '../lib/store';
 
 type Sp = 'dog' | 'cat';
 
@@ -23,9 +25,10 @@ export default function Kennels() {
           </button>
         ))}
       </div>
+      <ShelterluvPanel />
       <KennelList sp={sp} kennels={kennels.filter((k) => k.species === sp)} />
       <AnimalList sp={sp} animals={animals.filter((a) => a.species === sp)} kennels={kennels.filter((k) => k.species === sp)} />
-      <p className="note">Changes reach everyone's kennel log straight away. Once the Shelterluv key is connected, animal names will sync automatically and anything added here stays as a manual entry.</p>
+      <p className="note">Changes reach everyone's kennel log straight away. Animals from Shelterluv are marked "Shelterluv"; anything added here by hand stays as a manual entry.</p>
     </Page>
   );
 }
@@ -147,5 +150,39 @@ function AnimalDetail({ a }: { a: Row }) {
         {a.name} has left the shelter
       </button>
     </div>
+  );
+}
+
+function ShelterluvPanel() {
+  const settings = useTable('app_settings');
+  const last = settings.find((x) => x.key === 'shelterluv_last_sync')?.value;
+  const [busy, setBusy] = useState(false);
+  const sync = async () => {
+    setBusy(true);
+    const { data, error } = await supabase.functions.invoke('shelterluv-sync', { body: {} });
+    if (error) toast('Sync failed — check your signal');
+    else if (!data?.ok) toast(data?.error ?? 'Sync failed');
+    else toast(`Synced: ${data.added} added, ${data.updated} updated, ${data.left} left`);
+    await refresh(['animals', 'app_settings']).catch(() => {});
+    setBusy(false);
+  };
+  const when = last?.at ? `${shortDate(today(new Date(last.at)))} ${timeOf(last.at)}` : null;
+  return (
+    <section className="card">
+      <div className="head">
+        <h2 className="h">Shelterluv</h2>
+        <button className="btn sm" disabled={busy || !navigator.onLine} onClick={sync}>{busy ? 'Syncing…' : 'Sync now'}</button>
+      </div>
+      {!last && <span className="t14">Not synced yet. Animals in custody sync automatically every night at 05:00.</span>}
+      {last && !last.ok && <span className="bad">Last sync failed ({when}): {last.error}</span>}
+      {last?.ok && (
+        <>
+          <span className="t14">Last synced {when} · {last.inCustody} in custody · {last.added} added, {last.updated} updated, {last.left} left the shelter</span>
+          {last.unmatchedLocations?.length > 0 && (
+            <span className="warn">Shelterluv locations with no matching kennel here: {last.unmatchedLocations.join(', ')}. Name kennels to match (e.g. "D1") and they'll link automatically.</span>
+          )}
+        </>
+      )}
+    </section>
   );
 }
