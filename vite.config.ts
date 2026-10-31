@@ -11,7 +11,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: false,
       injectManifest: { globPatterns: ['**/*.{js,css,html,png,svg,woff2}'] },
       manifest: {
         name: 'PAWSapp — PAWS Rescue Qatar',
