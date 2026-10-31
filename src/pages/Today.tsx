@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { SyncBadge } from '../App';
 import KennelLog from '../components/KennelLog';
-import { SiteStatus, TeamStatus } from '../components/SiteStatus';
+import { SiteStatus, TeamStatus, VisitorsOnSite } from '../components/SiteStatus';
 import AnimalsOut from '../components/AnimalsOut';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
@@ -64,7 +64,7 @@ export default function Today() {
       </header>
 
       <main className="main">
-        {isMgmt && <TeamStatus />}
+        {isMgmt ? <TeamStatus /> : <VisitorsOnSite />}
         <AnimalsOut />
         <SiteStatus />
 

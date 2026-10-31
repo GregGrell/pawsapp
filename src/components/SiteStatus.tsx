@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { catStyle, hm, itemsOn, useProfiles, useTable } from '../lib/hooks';
 import { latestFor, reasonText } from '../lib/presence';
-import { insert } from '../lib/store';
+import { insert, update } from '../lib/store';
 import { nowHM, shortDate, timeOf, today } from '../lib/time';
 import { Icon, toast } from './ui';
 
@@ -140,7 +140,7 @@ export function TeamStatus() {
   const todays = events.filter((e) => today(new Date(e.at)) === d);
   const people = list.filter((p) => p.active && (p.role === 'staff' || todays.some((e) => e.user_id === p.id)));
 
-  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none'; text: string; vol?: boolean; visitor?: boolean };
+  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none'; text: string; vol?: boolean; visitor?: boolean; vid?: string };
   const rows: R[] = people.map((p) => {
     const last = latestFor(todays, p.id);
     const isSick = sick.some((s) => s.user_id === p.id && s.sick_on === d);
@@ -155,7 +155,7 @@ export function TeamStatus() {
   });
   for (const v of visitors.filter((v) => today(new Date(v.signed_in_at)) === d)) {
     rows.push({
-      key: v.id, label: `${v.name}${v.guests ? ` + ${v.guests}` : ''}`, sub: v.kind === 'volunteer' ? 'Visiting volunteer' : 'Visitor', visitor: true,
+      key: v.id, vid: v.signed_out_at ? undefined : v.id, label: `${v.name}${v.guests ? ` + ${v.guests}` : ''}`, sub: v.kind === 'volunteer' ? 'Visiting volunteer' : 'Visitor', visitor: true,
       state: v.signed_out_at ? 'off' : 'on',
       text: v.signed_out_at ? `In ${timeOf(v.signed_in_at)} · left ${timeOf(v.signed_out_at)}` : `On site since ${timeOf(v.signed_in_at)}`,
     });
@@ -182,9 +182,38 @@ export function TeamStatus() {
               <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'off' ? 'Off site. ' : ''}</span>{r.text}
             </span>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
+          {r.vid && <button className="btn ghost sm" style={{ flex: '0 0 auto' }} onClick={() => signOutVisitor(r.vid!, r.label)}>Sign out</button>}
+          {!r.vid && <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
             {r.state === 'on' ? 'ON' : 'OFF'}
-          </span>
+          </span>}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function signOutVisitor(id: string, label: string) {
+  update('visitors', { id }, { signed_out_at: new Date().toISOString() });
+  toast(`${label} signed out`);
+}
+
+/** Staff: visitors on site today, with a sign-out button. (Management sees them in TeamStatus.) */
+export function VisitorsOnSite() {
+  const visitors = useTable('visitors');
+  const d = today();
+  const on = visitors.filter((v) => !v.signed_out_at && today(new Date(v.signed_in_at)) === d);
+  if (!on.length) return null;
+  return (
+    <section className="card tight" aria-label="Visitors on site">
+      <h2 className="h" style={{ paddingBottom: 6 }}>Visitors on site · {on.reduce((n, v) => n + 1 + (v.guests || 0), 0)}</h2>
+      {on.map((v) => (
+        <div key={v.id} className="row" style={{ alignItems: 'center' }}>
+          <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0, background: '#86D7A2', border: '1.5px solid #16A34A' }} />
+          <div className="grow">
+            <span className="t15">{v.name}{v.guests ? ` + ${v.guests}` : ''}</span>
+            <span className="t13">{v.kind === 'volunteer' ? 'Visiting volunteer' : 'Visitor'} · since {timeOf(v.signed_in_at)}</span>
+          </div>
+          <button className="btn ghost sm" style={{ flex: '0 0 auto' }} onClick={() => signOutVisitor(v.id, v.name)}>Sign out</button>
         </div>
       ))}
     </section>

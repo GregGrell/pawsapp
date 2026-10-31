@@ -25,7 +25,7 @@ export default function VisitSignIn() {
         {state === 'done' ? (
           <>
             <h1 className="title" style={{ fontSize: 24 }}>Thanks, {name.split(' ')[0]}!</h1>
-            <p className="sub">You're signed in. Please let a member of staff know when you leave.</p>
+            <p className="sub">You're signed in. Please find a member of the PAWS team before you leave so they can sign you out.</p>
           </>
         ) : (
           <form className="login" onSubmit={submit}>
