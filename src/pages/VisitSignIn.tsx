@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 export default function VisitSignIn() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [group, setGroup] = useState(1);
   const [state, setState] = useState<'form' | 'busy' | 'done' | 'error'>('form');
 
   const phoneDigits = phone.replace(/\D/g, '').length;
@@ -13,7 +14,7 @@ export default function VisitSignIn() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setState('busy');
-    const { error } = await supabase.from('visitors').insert({ name: name.trim(), kind: 'visitor', guests: 0, phone: phone.trim() });
+    const { error } = await supabase.from('visitors').insert({ name: name.trim(), kind: 'visitor', guests: group - 1, phone: phone.trim() });
     setState(error ? 'error' : 'done');
   };
 
@@ -33,6 +34,12 @@ export default function VisitSignIn() {
             <p className="sub" style={{ textAlign: 'center' }}>Please sign in so we know who's on site.</p>
             <label className="field"><span>Your name</span><input required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
             <label className="field"><span>Phone number</span><input required type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="e.g. 5512 3456" /></label>
+            <label className="field">
+              <span>How many of you?</span>
+              <select value={group} onChange={(e) => setGroup(Number(e.target.value))}>
+                {Array.from({ length: 11 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'Just me' : `${n} people`}</option>)}
+              </select>
+            </label>
             {state === 'error' && <p className="bad">Couldn't sign in — please check your signal and try again, or ask a member of staff.</p>}
             <button className="btn full" disabled={state === 'busy' || !name.trim() || phoneDigits < 8}>{state === 'busy' ? 'Signing in…' : 'Sign in'}</button>
           </form>
