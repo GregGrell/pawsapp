@@ -34,7 +34,7 @@ export default function VisitSignIn() {
             <label className="field"><span>Your name</span><input required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>
             <label className="field"><span>Phone number</span><input required type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" placeholder="e.g. 5512 3456" /></label>
             {state === 'error' && <p className="bad">Couldn't sign in — please check your signal and try again, or ask a member of staff.</p>}
-            <button className="btn full" disabled={state === 'busy' || !name.trim() || phoneDigits < 7}>{state === 'busy' ? 'Signing in…' : 'Sign in'}</button>
+            <button className="btn full" disabled={state === 'busy' || !name.trim() || phoneDigits < 8}>{state === 'busy' ? 'Signing in…' : 'Sign in'}</button>
           </form>
         )}
       </div>
