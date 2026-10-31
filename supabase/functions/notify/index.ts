@@ -75,6 +75,13 @@ async function incidentAlert(id: string) {
   return sendTo('management', { title: '⚠ Incident reported', body: `${i.description}${i.location ? ` — ${i.location}` : ''} (${await name(i.reported_by)})`, url: '#/incidents', tag: `inc-${id}`, urgent: true });
 }
 
+async function maintenanceAlert(id: string) {
+  const { data: m } = await admin.from('maintenance_issues').select('*').eq('id', id).single();
+  if (!m || m.status === 'fixed') return 0;
+  if (!(await once(`maint:${id}`))) return 0;
+  return sendTo('management', { title: m.urgent ? '⚠ Urgent maintenance' : 'Maintenance reported', body: `${m.description}${m.location ? ` — ${m.location}` : ''} (${await name(m.reported_by)})`, url: '#/maintenance', tag: `maint-${id}`, urgent: !!m.urgent });
+}
+
 async function runSchedule() {
   const { day, hm, dow } = qatar();
   const now = toMin(hm);
@@ -120,6 +127,14 @@ async function runSchedule() {
 
   // New requests from management → staff
   const since = new Date(Date.now() - 2 * 86400_000).toISOString();
+
+  // Maintenance: backup for new reports, and tell the reporter when it's fixed
+  const { data: mt } = await admin.from('maintenance_issues').select('id, status, reported_by, updated_by, description').or(`created_at.gte.${since},updated_at.gte.${since}`);
+  for (const m of mt ?? []) {
+    if (m.status !== 'fixed' && (await maintenanceAlert(m.id))) log.push('maintenance');
+    if (m.status === 'fixed' && m.updated_by !== m.reported_by && (await once(`maint-fixed:${m.id}`)))
+      await sendTo([m.reported_by], { title: 'Fixed', body: m.description, url: '#/maintenance', tag: `maint-${m.id}` });
+  }
   const { data: reqs } = await admin.from('requests').select('*').eq('done', false).gte('created_at', since);
   for (const r of reqs ?? []) {
     if (await once(`req:${r.id}`)) {
@@ -171,6 +186,10 @@ Deno.serve(async (req) => {
 
     if (body.type === 'test') {
       const n = await sendTo([me.id], { title: 'PAWSapp test', body: 'Reminders are working on this phone.', url: '#/notifications' });
+      return Response.json({ ok: true, sent: n }, { headers: cors });
+    }
+    if (body.type === 'maintenance' && body.id) {
+      const n = await maintenanceAlert(String(body.id));
       return Response.json({ ok: true, sent: n }, { headers: cors });
     }
     if (body.type === 'incident' && body.id) {

@@ -72,6 +72,7 @@ function queries(userId: string, isMgmt: boolean) {
     appointment_outcomes: () => supabase.from('appointment_outcomes').select('*').gte('occurs_on', since30),
     requests: () => supabase.from('requests').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     request_replies: () => supabase.from('request_replies').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at'),
+    maintenance_issues: () => supabase.from('maintenance_issues').select('*').or(`status.neq.fixed,updated_at.gte.${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     incidents: () => supabase.from('incidents').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     leave_requests: () => supabase.from('leave_requests').select('*').gte('end_on', addDays(d, -90)).order('start_on'),
     sick_reports: () => supabase.from('sick_reports').select('*').gte('sick_on', addDays(d, -90)).order('sick_on', { ascending: false }),
@@ -237,6 +238,7 @@ async function flush() {
         error = r.error;
         // Incidents alert management straight away once they reach the server.
         if (!error && op.table === 'incidents') supabase.functions.invoke('notify', { body: { type: 'incident', id: op.row.id } }).catch(() => {});
+        if (!error && op.table === 'maintenance_issues') supabase.functions.invoke('notify', { body: { type: 'maintenance', id: op.row.id } }).catch(() => {});
       } else if (op.type === 'upsert') {
         const r = await supabase.from(op.table).upsert(op.row, { onConflict: op.onConflict });
         error = r.error;
@@ -268,7 +270,7 @@ let timer: any = null;
 function startRealtime() {
   if (channel) return;
   channel = supabase.channel('paws-live');
-  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors'];
+  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues'];
   live.forEach((t) =>
     channel!.on('postgres_changes' as any, { event: '*', schema: 'public', table: t }, () => {
       pending.add(t);

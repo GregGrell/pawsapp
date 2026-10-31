@@ -22,6 +22,7 @@ export default function More() {
   const pendingStaff = profiles.filter((p) => !p.active).length;
   const pendingLeave = leave.filter((l) => l.status === 'pending').length;
   const openIncidents = incidents.filter((i) => !i.acknowledged_at).length;
+  const openMaint = useTable('maintenance_issues').filter((m) => m.status !== 'fixed').length;
 
   return (
     <Page title="More" right={<span className="sync">{isMgmt ? 'Management' : 'Staff'}</span>}>
@@ -31,6 +32,7 @@ export default function More() {
 
       <section className="card menu">
         <Item to="/incidents" icon="alert" tint="var(--red-tint)" color="var(--red)" label="Incidents" sub="Report or review" badge={isMgmt ? openIncidents : 0} />
+        <Item to="/maintenance" icon="wrench" tint="var(--amber-tint)" color="var(--amber)" label="Maintenance" sub="Report broken things with a photo" badge={openMaint} />
         <Item to="/visitors" icon="qr" tint="var(--visitor-bg)" color="var(--visitor-fg)" label="Visitors" sub="Gate QR code and who's on site" />
         <Item to="/eod" icon="check" tint="var(--line-2)" color="var(--ink-2)" label="End-of-day check" sub="Today's report and past sign-offs" />
         <Item to="/notifications" icon="bell" tint="var(--line-2)" color="var(--ink-2)" label="Notifications" sub="Reminders on this phone" />

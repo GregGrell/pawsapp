@@ -14,6 +14,7 @@ export type DayReport = {
   apptsClosed: number;
   openAppts: string[];
   incidents: number;
+  maintenanceOpen: number;
   visitors: number;
   spent: number;
   log: { time: string; who: string; text: string }[];
@@ -44,6 +45,7 @@ export function buildReport(t: Tables, day: string, nameOf: (id?: string) => str
     apptsClosed: due.filter((a) => outs.some((o) => o.item_id === a.id)).length,
     openAppts: due.filter((a) => !outs.some((o) => o.item_id === a.id)).map((a) => a.title),
     incidents: (t.incidents ?? []).filter((i) => inDay(i.created_at, day)).length,
+    maintenanceOpen: (t.maintenance_issues ?? []).filter((m) => m.status !== 'fixed').length,
     visitors: (t.visitors ?? []).filter((v) => inDay(v.signed_in_at, day)).reduce((n, v) => n + 1 + (v.guests ?? 0), 0),
     spent: (t.petty_cash_spends ?? []).filter((s) => s.spent_on === day).reduce((n, s) => n + Number(s.amount), 0),
     log: logs.map((l) => ({ time: timeOf(l.created_at), who: nameOf(l.created_by), text: l.summary })),
@@ -63,5 +65,6 @@ export function reportLines(r: DayReport) {
     ['Tasks done', `${r.tasksDone} of ${r.tasksTotal}`],
     ['Appointments closed out', r.apptsDue ? `${r.apptsClosed} of ${r.apptsDue} due` : 'None due'],
     ['Incidents', String(r.incidents)],
+    ['Maintenance outstanding', String(r.maintenanceOpen)],
   ] as [string, string][];
 }

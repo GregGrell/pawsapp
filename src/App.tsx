@@ -18,6 +18,7 @@ import Incidents from './pages/Incidents';
 import Visitors from './pages/Visitors';
 import VisitSignIn from './pages/VisitSignIn';
 import Notifications from './pages/Notifications';
+import Maintenance from './pages/Maintenance';
 
 export default function App() {
   return (
@@ -58,6 +59,7 @@ function Shell() {
         <Route path="/incidents" element={<Incidents />} />
         <Route path="/visitors" element={<Visitors />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/maintenance" element={<Maintenance />} />
         <Route path="*" element={<Today />} />
       </Routes>
       <Nav path={loc.pathname} />
@@ -74,7 +76,7 @@ const TABS = [
   { to: '/cash', icon: 'cash', label: 'Petty cash' },
   { to: '/more', icon: 'more', label: 'More' },
 ];
-const MORE_PATHS = ['/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications'];
+const MORE_PATHS = ['/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance'];
 
 function Nav({ path }: { path: string }) {
   return (

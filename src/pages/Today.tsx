@@ -27,6 +27,8 @@ export default function Today() {
   const visitors = useTable('visitors');
   const signoffs = useTable('eod_signoffs');
   const ts = useTable('timesheet_entries');
+  const maint = useTable('maintenance_issues').filter((m) => m.status !== 'fixed');
+  const urgentMaint = maint.filter((m) => m.urgent);
   const [closing, setClosing] = useState<string | null>(null);
 
   const appts = itemsOn(items, d).filter((i) => i.kind === 'appointment');
@@ -73,8 +75,23 @@ export default function Today() {
           ))}
 
         {!isMgmt && (
-          <Link to="/incidents" className="btn danger full" style={{ minHeight: 48 }}>
-            <Icon name="alert" size={18} color="var(--red-strong)" width={2} /> Report an incident
+          <div className="grid2">
+            <Link to="/incidents" className="btn danger" style={{ minHeight: 48, padding: '0 8px' }}>
+              <Icon name="alert" size={18} color="var(--red-strong)" width={2} /> Incident
+            </Link>
+            <Link to="/maintenance" className="btn ghost" style={{ minHeight: 48, padding: '0 8px', color: 'var(--amber)', borderColor: 'var(--amber-line)' }}>
+              <Icon name="wrench" size={18} color="var(--amber)" width={2} /> Maintenance
+            </Link>
+          </div>
+        )}
+
+        {maint.length > 0 && (
+          <Link to="/maintenance" className="banner amber" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <Icon name="wrench" size={22} color="var(--amber)" width={2} />
+            <div className="grow">
+              <strong className="warn" style={{ fontSize: 15 }}>{maint.length} maintenance issue{maint.length > 1 ? 's' : ''} outstanding{urgentMaint.length ? ` · ${urgentMaint.length} urgent` : ''}</strong>
+              <span className="t13">{maint.slice(0, 3).map((m) => m.description).join(' · ')}</span>
+            </div>
           </Link>
         )}
 
