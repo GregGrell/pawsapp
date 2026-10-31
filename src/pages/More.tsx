@@ -32,6 +32,7 @@ export default function More() {
 
       <section className="card menu">
         <Item to="/incidents" icon="alert" tint="var(--red-tint)" color="var(--red)" label="Incidents" sub="Report or review" badge={isMgmt ? openIncidents : 0} />
+        <Item to="/animal-out" icon="suitcase" tint="#E8F0FC" color="#1E4E8C" label="Animal sign-outs" sub="Temporary trips and permanent moves" />
         <Item to="/maintenance" icon="wrench" tint="var(--amber-tint)" color="var(--amber)" label="Maintenance" sub="Report broken things with a photo" badge={openMaint} />
         <Item to="/visitors" icon="qr" tint="var(--visitor-bg)" color="var(--visitor-fg)" label="Visitors" sub="Gate QR code and who's on site" />
         <Item to="/eod" icon="check" tint="var(--line-2)" color="var(--ink-2)" label="End-of-day check" sub="Today's report and past sign-offs" />

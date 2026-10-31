@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import { SyncBadge } from '../App';
 import KennelLog from '../components/KennelLog';
 import { SiteStatus, TeamStatus } from '../components/SiteStatus';
+import AnimalsOut from '../components/AnimalsOut';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
 import { Empty, Icon, PhotoPicker, StoredImage, toast } from '../components/ui';
@@ -64,6 +65,7 @@ export default function Today() {
 
       <main className="main">
         {isMgmt && <TeamStatus />}
+        <AnimalsOut />
         <SiteStatus />
 
         {isMgmt &&
@@ -88,6 +90,9 @@ export default function Today() {
             </Link>
           </div>
         )}
+        <Link to="/animal-out" className="btn ghost full" style={{ minHeight: 48 }}>
+          <Icon name="suitcase" size={18} color="var(--blue)" width={2} /> Sign out an animal
+        </Link>
 
         {maint.length > 0 && (
           <Link to="/maintenance" className="banner amber" style={{ textDecoration: 'none', color: 'inherit' }}>

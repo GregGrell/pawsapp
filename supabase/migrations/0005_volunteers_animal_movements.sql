@@ -1,0 +1,4 @@
+-- See Supabase migration "volunteers_and_animal_movements" (applied 2026-11-01):
+-- volunteer role; is_active() = staff/management, is_member() = any approved account;
+-- volunteer policies for incidents, maintenance, presence, kennels/animals, photos;
+-- 'signed_out' presence reason; animal_movements table with permanent-move trigger.

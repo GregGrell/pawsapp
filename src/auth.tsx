@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 import { boot, clearLocal } from './lib/store';
 import { Stripe } from './components/ui';
 
-type Profile = { id: string; full_name: string; email: string; role: 'staff' | 'management'; active: boolean };
+type Profile = { id: string; full_name: string; email: string; role: 'staff' | 'management' | 'volunteer'; active: boolean };
 type Ctx = { session: Session; me: Profile; isMgmt: boolean; signOut: () => Promise<void> };
 const AuthCtx = createContext<Ctx | null>(null);
 export const useAuth = () => useContext(AuthCtx)!;

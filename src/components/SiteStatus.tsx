@@ -48,6 +48,7 @@ export function SiteStatus() {
   }
 
   const onSite = last?.event === 'in';
+  const isVol = me.role === 'volunteer';
 
   if (!onSite)
     return (
@@ -89,8 +90,14 @@ export function SiteStatus() {
         </div>
         <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, background: '#16A34A' }} />
       </div>
-      {!leaving && <button className="btn ghost full" onClick={() => setLeaving(true)}>Leave site</button>}
-      {leaving && (
+      {isVol && (
+        <button className="btn ghost full" onClick={() => {
+          insert('site_presence', { user_id: me.id, event: 'out', at: new Date().toISOString(), reason_kind: 'signed_out', reason: '', added_by: me.id, created_at: new Date().toISOString() });
+          toast('Signed out — thank you!');
+        }}>Sign out of site</button>
+      )}
+      {!isVol && !leaving && <button className="btn ghost full" onClick={() => setLeaving(true)}>Leave site</button>}
+      {!isVol && leaving && (
         <div className="panel" style={{ background: '#fff', border: '1px solid var(--line)' }}>
           <strong style={{ fontSize: 15 }}>Why are you leaving?</strong>
           {upcoming.length > 0 && (
@@ -122,56 +129,64 @@ export function SiteStatus() {
   );
 }
 
-/** Management: who is on site right now. */
+/** Management: who is on site today — staff, volunteers and QR visitors. Resets at midnight. */
 export function TeamStatus() {
   const { list, name } = useProfiles();
   const events = useTable('site_presence');
   const leave = useTable('leave_requests');
   const sick = useTable('sick_reports');
+  const visitors = useTable('visitors');
   const d = today();
-  const people = list.filter((p) => p.active && (p.role === 'staff' || events.some((e) => e.user_id === p.id && today(new Date(e.at)) === d)));
-  if (!people.length) return null;
+  const todays = events.filter((e) => today(new Date(e.at)) === d);
+  const people = list.filter((p) => p.active && (p.role === 'staff' || todays.some((e) => e.user_id === p.id)));
 
-  const rows = people.map((p) => {
-    const last = latestFor(events, p.id);
-    const lastToday = last && today(new Date(last.at)) === d;
+  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none'; text: string; vol?: boolean; visitor?: boolean };
+  const rows: R[] = people.map((p) => {
+    const last = latestFor(todays, p.id);
     const isSick = sick.some((s) => s.user_id === p.id && s.sick_on === d);
     const onLeave = leave.some((l) => l.user_id === p.id && l.status === 'approved' && l.start_on <= d && l.end_on >= d);
-    let state: 'on' | 'off' | 'none' = 'none';
+    let state: R['state'] = 'none';
     let text = 'Not in yet today';
-    if (last?.event === 'in' && (lastToday || today(new Date(last.at)) < d)) {
-      state = 'on';
-      text = lastToday ? `On site since ${timeOf(last.at)}` : `Still signed in from ${shortDate(today(new Date(last.at)))}`;
-    } else if (lastToday && last?.event === 'out') {
-      state = 'off';
-      text = `${reasonText(last)} · left ${timeOf(last.at)}`;
-    } else if (isSick) { state = 'off'; text = 'Off sick'; }
+    if (last?.event === 'in') { state = 'on'; text = `On site since ${timeOf(last.at)}`; }
+    else if (last?.event === 'out') { state = 'off'; text = p.role === 'volunteer' ? `Left ${timeOf(last.at)}` : `${reasonText(last)} · left ${timeOf(last.at)}`; }
+    else if (isSick) { state = 'off'; text = 'Off sick'; }
     else if (onLeave) { state = 'off'; text = 'On leave'; }
-    return { p, state, text };
-  }).sort((a, b) => ({ on: 0, off: 1, none: 2 }[a.state] - { on: 0, off: 1, none: 2 }[b.state]));
+    return { key: p.id, label: name(p.id), sub: p.role === 'volunteer' ? 'Volunteer' : undefined, state, text, vol: p.role === 'volunteer' };
+  });
+  for (const v of visitors.filter((v) => today(new Date(v.signed_in_at)) === d)) {
+    rows.push({
+      key: v.id, label: `${v.name}${v.guests ? ` + ${v.guests}` : ''}`, sub: v.kind === 'volunteer' ? 'Visiting volunteer' : 'Visitor', visitor: true,
+      state: v.signed_out_at ? 'off' : 'on',
+      text: v.signed_out_at ? `In ${timeOf(v.signed_in_at)} · left ${timeOf(v.signed_out_at)}` : `On site since ${timeOf(v.signed_in_at)}`,
+    });
+  }
+  if (!rows.length) return null;
+  const order = { on: 0, off: 1, none: 2 };
+  rows.sort((a, b) => order[a.state] - order[b.state] || Number(!!a.visitor) - Number(!!b.visitor));
 
-  const count = rows.filter((r) => r.state === 'on').length;
+  const onCount = rows.filter((r) => r.state === 'on').reduce((n, r) => n + 1 + (r.visitor ? Number(r.label.match(/\+ (\d+)$/)?.[1] ?? 0) : 0), 0);
+  const dot = (r: R) => (r.state === 'on' ? (r.vol || r.visitor ? '#86D7A2' : '#16A34A') : r.state === 'off' ? 'var(--amber)' : '#C9D2CE');
+  const badgeBg = (r: R) => (r.state === 'on' ? (r.vol || r.visitor ? '#F0FAF3' : '#E6F4EA') : r.state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)');
   return (
-    <section className="card tight" aria-label="Team on site">
+    <section className="card tight" aria-label="On site today">
       <div className="head" style={{ paddingBottom: 6 }}>
-        <h2 className="h">Team · {count} on site</h2>
+        <h2 className="h">On site · {onCount}</h2>
         <Link to="/site-report" style={{ fontWeight: 600, fontSize: 14 }}>Weekly report</Link>
       </div>
-      {rows.map(({ p, state, text }) => (
-        <div key={p.id} className="row" style={{ alignItems: 'center' }}>
-          <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0, background: state === 'on' ? '#16A34A' : state === 'off' ? 'var(--amber)' : '#C9D2CE' }} />
+      {rows.map((r) => (
+        <div key={r.key} className="row" style={{ alignItems: 'center' }}>
+          <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0, background: dot(r), border: r.visitor && r.state === 'on' ? '1.5px solid #16A34A' : undefined }} />
           <div className="grow">
-            <span className="t15">{name(p.id)}</span>
-            <span className="t13" style={state === 'off' ? { color: 'var(--amber)', fontWeight: 600 } : undefined}>
-              <span className="sr-only">{state === 'on' ? 'On site. ' : state === 'off' ? 'Off site. ' : ''}</span>{text}
+            <span className="t15">{r.label}{r.sub && <span className="t13" style={{ fontWeight: 500 }}> · {r.sub}</span>}</span>
+            <span className="t13" style={r.state === 'off' && !r.visitor ? { color: 'var(--amber)', fontWeight: 600 } : undefined}>
+              <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'off' ? 'Off site. ' : ''}</span>{r.text}
             </span>
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: state === 'on' ? '#E6F4EA' : state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)', color: state === 'on' ? '#166534' : state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
-            {state === 'on' ? 'ON' : 'OFF'}
+          <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
+            {r.state === 'on' ? 'ON' : 'OFF'}
           </span>
         </div>
       ))}
     </section>
   );
 }
-

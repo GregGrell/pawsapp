@@ -10,6 +10,7 @@ export const REASON_LABEL: Record<string, string> = {
   break: 'Break',
   errand: 'Errand / supplies run',
   other: 'Other',
+  signed_out: 'Signed out',
 };
 
 export function latestFor(events: Row[], userId: string): Row | undefined {

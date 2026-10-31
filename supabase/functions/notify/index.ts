@@ -31,7 +31,8 @@ type Payload = { title: string; body: string; url?: string; tag?: string; urgent
 async function sendTo(userIds: string[] | 'all' | 'management' | 'staff', p: Payload) {
   let q = admin.from('profiles').select('id, role').eq('active', true);
   if (userIds === 'management') q = q.eq('role', 'management');
-  if (userIds === 'staff') q = q.eq('role', 'staff');
+  else if (userIds === 'staff') q = q.eq('role', 'staff');
+  else if (userIds === 'all') q = q.in('role', ['staff', 'management']); // the team — volunteers don't get staff reminders
   const { data: people } = await q;
   const ids = (people ?? []).map((x) => x.id).filter((id) => (Array.isArray(userIds) ? userIds.includes(id) : true));
   if (!ids.length) return 0;
@@ -80,6 +81,14 @@ async function maintenanceAlert(id: string) {
   if (!m || m.status === 'fixed') return 0;
   if (!(await once(`maint:${id}`))) return 0;
   return sendTo('management', { title: m.urgent ? '⚠ Urgent maintenance' : 'Maintenance reported', body: `${m.description}${m.location ? ` — ${m.location}` : ''} (${await name(m.reported_by)})`, url: '#/maintenance', tag: `maint-${id}`, urgent: !!m.urgent });
+}
+
+async function animalOutAlert(id: string) {
+  const { data: m } = await admin.from('animal_movements').select('*').eq('id', id).single();
+  if (!m || m.kind !== 'permanent') return 0;
+  if (!(await once(`move:${id}`))) return 0;
+  const where = ({ foster: 'to foster', adopter: 'to adopter', transfer: 'transfer / travel', other: 'permanently' } as any)[m.destination] ?? 'permanently';
+  return sendTo('all', { title: `${m.animal_name} has left ${where}`, body: `${m.reason} — signed out by ${await name(m.out_by)}`, url: '#/animal-out', tag: `move-${id}` });
 }
 
 async function runSchedule() {
@@ -135,6 +144,9 @@ async function runSchedule() {
     if (m.status === 'fixed' && m.updated_by !== m.reported_by && (await once(`maint-fixed:${m.id}`)))
       await sendTo([m.reported_by], { title: 'Fixed', body: m.description, url: '#/maintenance', tag: `maint-${m.id}` });
   }
+  const { data: mv } = await admin.from('animal_movements').select('id').eq('kind', 'permanent').gte('created_at', since);
+  for (const m of mv ?? []) if (await animalOutAlert(m.id)) log.push('animal out');
+
   const { data: reqs } = await admin.from('requests').select('*').eq('done', false).gte('created_at', since);
   for (const r of reqs ?? []) {
     if (await once(`req:${r.id}`)) {
@@ -186,6 +198,10 @@ Deno.serve(async (req) => {
 
     if (body.type === 'test') {
       const n = await sendTo([me.id], { title: 'PAWSapp test', body: 'Reminders are working on this phone.', url: '#/notifications' });
+      return Response.json({ ok: true, sent: n }, { headers: cors });
+    }
+    if (body.type === 'animal_out' && body.id) {
+      const n = await animalOutAlert(String(body.id));
       return Response.json({ ok: true, sent: n }, { headers: cors });
     }
     if (body.type === 'maintenance' && body.id) {

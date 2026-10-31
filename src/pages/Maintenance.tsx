@@ -102,7 +102,7 @@ function Issue({ i }: { i: Row }) {
           <StoredImage bucket="photos" path={i.fix_photo_path} />
         </div>
       )}
-      {i.status !== 'fixed' && !fixing && (
+      {i.status !== 'fixed' && !fixing && me.role !== 'volunteer' && (
         <div className="btns" style={{ width: '100%' }}>
           {i.status === 'open' && (
             <button className="btn ghost sm" onClick={() => update('maintenance_issues', { id: i.id }, { status: 'in_progress', updated_by: me.id, updated_at: new Date().toISOString() })}>I'm on it</button>
