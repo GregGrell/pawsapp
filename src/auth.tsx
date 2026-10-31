@@ -84,7 +84,7 @@ function Pending({ onRefresh }: { onRefresh: () => void }) {
     <div className="center">
       <img src="./logo.png" alt="PAWS Rescue Qatar" width={120} />
       <h1 className="title" style={{ fontSize: 22 }}>Waiting for approval</h1>
-      <p className="sub" style={{ maxWidth: 320 }}>Your account is set up. Lucy or another manager needs to approve it in PAWSapp before you can start.</p>
+      <p className="sub" style={{ maxWidth: 320 }}>Your account is set up. A member of the management team needs to approve it in PAWSapp before you can start.</p>
       <div className="btns" style={{ width: '100%', maxWidth: 320 }}>
         <button className="btn" onClick={onRefresh}>Check again</button>
         <button className="btn ghost" onClick={() => supabase.auth.signOut()}>Sign out</button>
