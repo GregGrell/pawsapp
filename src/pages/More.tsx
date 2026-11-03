@@ -46,6 +46,7 @@ export default function More() {
       {isMgmt && (
         <section className="card menu">
           <span className="sect h">Management settings</span>
+          <Item to="/reports" icon="tasks" tint="#FCE7F3" color="#9D174D" label="Reports" sub="Month, year or any dates: adoptions, care, money, staff" />
           <Item to="/site-report" icon="clock" tint="var(--line-2)" color="var(--ink-2)" label="Time on site" sub="Weekly hours per person, CSV export" />
           <Item to="/treatment-types" icon="settings" tint="var(--line-2)" color="var(--ink-2)" label="Treatment schedule" sub="Vaccines, worming, flea & tick intervals" />
           <Item to="/staff" icon="people" tint="var(--line-2)" color="var(--ink-2)" label="Staff & permissions" sub="Approve new accounts, set roles" badge={pendingStaff} />

@@ -29,6 +29,7 @@ import TreatmentTypes from './pages/TreatmentTypes';
 import RecordsMore from './pages/RecordsMore';
 import { FlightListEdit, FlightLists } from './pages/FlightList';
 import { ContactEdit, Contacts } from './pages/Contacts';
+import Reports from './pages/Reports';
 
 export default function App() {
   return (
@@ -85,7 +86,7 @@ function Shell() {
       </div>
     );
   return (
-    <div className={`app${/^\/(records|flight-lists|contacts)/.test(loc.pathname) ? ' wide' : ''}`}>
+    <div className={`app${/^\/(records|flight-lists|contacts|reports)/.test(loc.pathname) ? ' wide' : ''}`}>
       <Stripe />
       <Routes>
         <Route path="/" element={<Today />} />
@@ -113,6 +114,7 @@ function Shell() {
         <Route path="/flight-lists/:id" element={<FlightListEdit />} />
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/contacts/:id" element={<ContactEdit />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="*" element={<Today />} />
       </Routes>
       <Nav path={loc.pathname} tabs={TABS} morePaths={MORE_PATHS} />
@@ -135,7 +137,7 @@ const REC_TABS = [
   { to: '/contacts', icon: 'people', label: 'People' },
   { to: '/more', icon: 'more', label: 'More' },
 ];
-const MORE_PATHS = ['/records', '/flight-lists', '/contacts', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
+const MORE_PATHS = ['/reports', '/records', '/flight-lists', '/contacts', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
 const VOL_TABS = [
   { to: '/', icon: 'home', label: 'Today' },
   { to: '/animal-out', icon: 'suitcase', label: 'Animals' },
