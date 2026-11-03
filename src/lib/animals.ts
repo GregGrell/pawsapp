@@ -95,12 +95,12 @@ export const FIELD_LABEL: Record<string, string> = {
   product: 'Product', manufacturer: 'Manufacturer', batch: 'Batch', vet: 'Vet', result: 'Result', certificate_path: 'Certificate', title: 'Title', body: 'Details',
   noted_on: 'Date', file_path: 'File', with_name: 'With', with_contact: 'Contact', country: 'Country', from_on: 'From', note: 'Note',
   instructions: 'Dose / when', active: 'Active', started_on: 'Started', ended_on: 'Stopped', caption: 'Caption', kind: 'Type',
-  reason: 'Reason', destination: 'Going to', returned_at: 'Returned', type_id: 'Treatment',
+  reason: 'Reason', kg: 'Weight (kg)', weighed_on: 'Weighed', checked_on: 'Checked', scanned: 'Number scanned', contact_id: 'Contact', destination: 'Going to', returned_at: 'Returned', type_id: 'Treatment',
 };
 
 export const TABLE_LABEL: Record<string, string> = {
   animals: 'Profile', animal_locations: 'Location', treatments: 'Treatment', medical_notes: 'Medical note',
-  animal_files: 'Photo / file', medications: 'Medication', animal_movements: 'Sign-out',
+  animal_files: 'Photo / file', medications: 'Medication', animal_movements: 'Sign-out', animal_weights: 'Weight', microchip_checks: 'Microchip check',
 };
 
 /** Structured results for disease tests. Stored as text, e.g. "FIV negative · FeLV negative". */
@@ -116,3 +116,10 @@ export function latestGiven(treatments: Row[], match: (t: Row) => boolean) {
   return treatments.filter((t) => t.given_on && match(t)).sort((a, b) => b.given_on.localeCompare(a.given_on) || b.created_at.localeCompare(a.created_at))[0] ?? null;
 }
 export const isRabies = (t: Row) => t.kind === 'vaccine' && /rabies/i.test(t.name);
+
+export const CHIP_RESULT: Record<string, { label: string; bad: boolean }> = {
+  ok: { label: 'Read OK, number matches', bad: false },
+  not_found: { label: "Couldn't find chip", bad: true },
+  mismatch: { label: 'Number different', bad: true },
+};
+export const CONTACT_KIND: Record<string, string> = { adopter: 'Adopter', foster: 'Foster carer', other: 'Other' };

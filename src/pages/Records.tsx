@@ -90,6 +90,7 @@ export default function Records() {
     <Page title="Animal records" sub={`${counts.dog} dogs · ${counts.cat} cats in our care · ${animals.length} records`}
       right={
         <div style={{ display: 'flex', gap: 8 }}>
+          <Link className="btn ghost sm" to="/contacts">People</Link>
           <Link className="btn ghost sm" to="/flight-lists">Flight lists</Link>
           <button className="btn sm" onClick={() => setAdding(!adding)}><Icon name="plus" size={16} color="#fff" width={2.4} /> Add</button>
         </div>

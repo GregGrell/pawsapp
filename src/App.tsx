@@ -28,6 +28,7 @@ import AnimalRecord from './pages/AnimalRecord';
 import TreatmentTypes from './pages/TreatmentTypes';
 import RecordsMore from './pages/RecordsMore';
 import { FlightListEdit, FlightLists } from './pages/FlightList';
+import { ContactEdit, Contacts } from './pages/Contacts';
 
 export default function App() {
   return (
@@ -59,6 +60,8 @@ function Shell() {
           <Route path="/more" element={<RecordsMore />} />
           <Route path="/flight-lists" element={<FlightLists />} />
           <Route path="/flight-lists/:id" element={<FlightListEdit />} />
+          <Route path="/contacts" element={<Contacts />} />
+          <Route path="/contacts/:id" element={<ContactEdit />} />
           <Route path="*" element={<Records />} />
         </Routes>
         <Nav path={loc.pathname} tabs={REC_TABS} morePaths={['/more']} />
@@ -82,7 +85,7 @@ function Shell() {
       </div>
     );
   return (
-    <div className={`app${loc.pathname.startsWith('/records') || loc.pathname.startsWith('/flight-lists') ? ' wide' : ''}`}>
+    <div className={`app${/^\/(records|flight-lists|contacts)/.test(loc.pathname) ? ' wide' : ''}`}>
       <Stripe />
       <Routes>
         <Route path="/" element={<Today />} />
@@ -108,6 +111,8 @@ function Shell() {
         <Route path="/treatment-types" element={<TreatmentTypes />} />
         <Route path="/flight-lists" element={<FlightLists />} />
         <Route path="/flight-lists/:id" element={<FlightListEdit />} />
+        <Route path="/contacts" element={<Contacts />} />
+        <Route path="/contacts/:id" element={<ContactEdit />} />
         <Route path="*" element={<Today />} />
       </Routes>
       <Nav path={loc.pathname} tabs={TABS} morePaths={MORE_PATHS} />
@@ -127,9 +132,10 @@ const TABS = [
 const REC_TABS = [
   { to: '/', icon: 'heart', label: 'Animals' },
   { to: '/flight-lists', icon: 'suitcase', label: 'Flight lists' },
+  { to: '/contacts', icon: 'people', label: 'People' },
   { to: '/more', icon: 'more', label: 'More' },
 ];
-const MORE_PATHS = ['/records', '/flight-lists', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
+const MORE_PATHS = ['/records', '/flight-lists', '/contacts', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
 const VOL_TABS = [
   { to: '/', icon: 'home', label: 'Today' },
   { to: '/animal-out', icon: 'suitcase', label: 'Animals' },

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { Empty, Page, Pill, PhotoPicker, StoredImage, toast } from '../components/ui';
-import { FIELD_LABEL, KIND_LABEL, SEX_LABEL, STATUS, STATUS_ORDER, TABLE_LABEL, ageText, careDue, isPositive, latestGiven, testParts, typesFor } from '../lib/animals';
+import { CHIP_RESULT, CONTACT_KIND, FIELD_LABEL, KIND_LABEL, SEX_LABEL, STATUS, STATUS_ORDER, TABLE_LABEL, ageText, careDue, isPositive, latestGiven, testParts, typesFor } from '../lib/animals';
 import { useProfiles, useTable } from '../lib/hooks';
 import { insert, queueUpload, remove, update, type Row } from '../lib/store';
 import { supabase } from '../lib/supabase';
@@ -37,7 +37,7 @@ export default function AnimalRecord() {
       <div className="pills" role="tablist">
         {TABS.map(([k, l]) => <Pill key={k} on={tab === k} onClick={() => setTab(k)}>{l}</Pill>)}
       </div>
-      {tab === 'profile' && <Profile a={a} />}
+      {tab === 'profile' && <><Profile a={a} /><Weights a={a} /><ChipChecks a={a} /></>}
       {tab === 'care' && <Care a={a} />}
       {tab === 'meds' && <Meds a={a} />}
       {tab === 'medical' && <Medical a={a} />}
@@ -110,6 +110,80 @@ function Profile({ a }: { a: Row }) {
       <label className="field"><span>Came into PAWS on</span><input type="date" value={f.intake_on} max={today()} onChange={(e) => set('intake_on', e.target.value)} /></label>
       <label className="field"><span>Notes</span><textarea rows={4} value={f.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Temperament, good with kids / cats / dogs, history…" /></label>
       <button className="btn" disabled={!dirty || !f.name.trim() || !!dup} onClick={save}>{dirty ? 'Save changes' : 'No changes'}</button>
+    </section>
+  );
+}
+
+// ---------- Weight ----------
+function Weights({ a }: { a: Row }) {
+  const { me } = useAuth();
+  const { name } = useProfiles();
+  const list = useTable('animal_weights').filter((w) => w.animal_id === a.id).sort((x, y) => y.weighed_on.localeCompare(x.weighed_on) || y.created_at.localeCompare(x.created_at));
+  const [kg, setKg] = useState('');
+  const [on, setOn] = useState(today());
+  const v = parseFloat(kg);
+  return (
+    <section className="card">
+      <div className="head"><h2 className="h">Weight</h2>{list[0] && <span className="t14"><b>{Number(list[0].kg)} kg</b> on {fmt(list[0].weighed_on)}</span>}</div>
+      <div className="grid2">
+        <label className="field"><span>Weight (kg)</span><input type="number" inputMode="decimal" min="0" step="0.1" value={kg} onChange={(e) => setKg(e.target.value)} placeholder="0.0" /></label>
+        <label className="field"><span>Weighed on</span><input type="date" value={on} max={today()} onChange={(e) => setOn(e.target.value)} /></label>
+      </div>
+      <button className="btn outline" disabled={!(v > 0 && v < 200)} onClick={() => {
+        insert('animal_weights', { animal_id: a.id, weighed_on: on, kg: v, notes: '', created_by: me.id, created_at: nowIso() });
+        setKg(''); toast(`${v} kg recorded`);
+      }}>Record weight</button>
+      {list.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {list.slice(0, 12).map((w, i) => {
+            const prev = list[i + 1];
+            const diff = prev ? Number(w.kg) - Number(prev.kg) : 0;
+            return (
+              <div key={w.id} className="row" style={{ alignItems: 'center' }}>
+                <span className="t14" style={{ width: 90 }}>{fmt(w.weighed_on)}</span>
+                <span className="t15" style={{ flex: 1 }}>{Number(w.kg)} kg{prev && diff !== 0 && <span className="t13" style={{ color: diff > 0 ? 'var(--ink-2)' : 'var(--amber)' }}> · {diff > 0 ? '+' : '−'}{Math.abs(diff).toFixed(1)}</span>}</span>
+                <span className="t13">{name(w.created_by)}</span>
+                <ManageButton table="animal_weights" row={w} label={`${Number(w.kg)} kg on ${fmt(w.weighed_on)}`} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------- Microchip checks ----------
+function ChipChecks({ a }: { a: Row }) {
+  const { me } = useAuth();
+  const { name } = useProfiles();
+  const list = useTable('microchip_checks').filter((c) => c.animal_id === a.id).sort((x, y) => y.checked_on.localeCompare(x.checked_on) || y.created_at.localeCompare(x.created_at));
+  const [on, setOn] = useState(today());
+  const [result, setResult] = useState('ok');
+  const [scanned, setScanned] = useState('');
+  const [notes, setNotes] = useState('');
+  const last = list[0];
+  return (
+    <section className="card">
+      <div className="head">
+        <h2 className="h">Microchip checks</h2>
+        {last && <span className="t14" style={CHIP_RESULT[last.result]?.bad ? { color: 'var(--red)', fontWeight: 700 } : undefined}>Last {fmt(last.checked_on)} · {CHIP_RESULT[last.result]?.label}</span>}
+      </div>
+      <label className="field"><span>Checked on</span><input type="date" value={on} max={today()} onChange={(e) => setOn(e.target.value)} /></label>
+      <div className="pills">{Object.entries(CHIP_RESULT).map(([k, r]) => <Pill key={k} on={result === k} onClick={() => setResult(k)}>{r.label}</Pill>)}</div>
+      {result === 'mismatch' && <label className="field"><span>Number the scanner read</span><input inputMode="numeric" value={scanned} onChange={(e) => setScanned(e.target.value)} /></label>}
+      <label className="field"><span>Notes · optional</span><input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Pre-flight check at vet" /></label>
+      <button className="btn outline" disabled={result === 'mismatch' && !scanned.trim()} onClick={() => {
+        insert('microchip_checks', { animal_id: a.id, checked_on: on, result, scanned: scanned.replace(/\s/g, ''), notes: notes.trim(), created_by: me.id, created_at: nowIso() });
+        setScanned(''); setNotes(''); setResult('ok'); toast('Microchip check recorded');
+      }}>Record check</button>
+      {list.map((c) => (
+        <div key={c.id} className="row" style={{ flexDirection: 'column', gap: 2 }}>
+          <span className="t15" style={CHIP_RESULT[c.result]?.bad ? { color: 'var(--red)' } : undefined}>{fmt(c.checked_on)} · {CHIP_RESULT[c.result]?.label}{c.scanned ? ` (read ${c.scanned})` : ''}</span>
+          <span className="t13">{[c.notes, name(c.created_by)].filter(Boolean).join(' · ')}</span>
+          <ManageButton table="microchip_checks" row={c} label={`check on ${fmt(c.checked_on)}`} />
+        </div>
+      ))}
     </section>
   );
 }
@@ -416,24 +490,40 @@ function Where({ a }: { a: Row }) {
   const history = useTable('animal_locations').filter((l) => l.animal_id === a.id).sort((x, y) => y.from_on.localeCompare(x.from_on) || y.created_at.localeCompare(x.created_at));
   const [status, setStatus] = useState(a.status === 'shelter' ? 'foster' : 'shelter');
   const [kennelId, setKennelId] = useState('');
+  const contacts = useTable('contacts');
+  const [contactId, setContactId] = useState('');
+  const [c, setC] = useState({ full_name: '', phone: '', email: '', address: '', city: '', country: '' });
   const [withName, setWithName] = useState('');
-  const [contact, setContact] = useState('');
-  const [country, setCountry] = useState('');
   const [on, setOn] = useState(today());
   const [note, setNote] = useState('');
   const code = (id?: string) => kennels.find((k) => k.id === id)?.code;
   const latest = history[0];
   const backdated = latest && on < latest.from_on;
+  const usesContact = ['foster', 'trial', 'adopted', 'returned'].includes(status);
   const needsWho = ['foster', 'trial', 'adopted'].includes(status);
+  const picked = contacts.find((x) => x.id === contactId);
+  const isNew = contactId === '__new';
+  const whoOk = !needsWho || (picked || (isNew && c.full_name.trim()));
+  const setField = (k: string, v: string) => setC((x) => ({ ...x, [k]: v }));
 
   const save = () => {
+    let contact = picked ?? null;
+    if (usesContact && isNew && c.full_name.trim()) {
+      contact = insert('contacts', {
+        kind: status === 'foster' ? 'foster' : 'adopter', full_name: c.full_name.trim(), phone: c.phone.trim(), email: c.email.trim(),
+        address: c.address.trim(), city: c.city.trim(), country: c.country.trim(), notes: '', created_by: me.id, created_at: nowIso(), updated_at: nowIso(),
+      });
+    }
     insert('animal_locations', {
-      animal_id: a.id, status, kennel_id: status === 'shelter' ? kennelId || null : null, with_name: withName.trim(), with_contact: contact.trim(),
-      country: country.trim(), from_on: on, note: note.trim(), created_by: me.id, created_at: nowIso(),
+      animal_id: a.id, status, kennel_id: status === 'shelter' ? kennelId || null : null,
+      contact_id: usesContact && contact ? contact.id : null,
+      with_name: usesContact && contact ? contact.full_name : withName.trim(),
+      with_contact: usesContact && contact ? [contact.phone, contact.email].filter(Boolean).join(' · ') : '',
+      country: usesContact && contact ? contact.country ?? '' : '', from_on: on, note: note.trim(), created_by: me.id, created_at: nowIso(),
     });
     // show the change straight away; the server confirms it
     if (!backdated) update('animals', { id: a.id }, { status, status_since: on, in_shelter: status === 'shelter', kennel_id: status === 'shelter' ? kennelId || null : null });
-    setWithName(''); setContact(''); setCountry(''); setNote('');
+    setWithName(''); setNote(''); setContactId(''); setC({ full_name: '', phone: '', email: '', address: '', city: '', country: '' });
     toast(backdated ? 'Added to history' : `${a.name}: ${STATUS[status].label}`);
   };
 
@@ -455,19 +545,38 @@ function Where({ a }: { a: Row }) {
             </select>
           </label>
         )}
-        {status !== 'shelter' && status !== 'deceased' && (
-          <div className="grid2">
-            <label className="field"><span>{needsWho ? 'With (name)' : 'With / where'}</span><input value={withName} onChange={(e) => setWithName(e.target.value)} /></label>
-            <label className="field"><span>Contact · optional</span><input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="Phone or email" /></label>
+        {usesContact && (
+          <label className="field">
+            <span>{status === 'foster' ? 'Foster carer' : status === 'returned' ? 'Owner' : 'Adopter'}</span>
+            <select value={contactId} onChange={(e) => setContactId(e.target.value)}>
+              <option value="">Choose…</option>
+              <option value="__new">+ New person</option>
+              {contacts.slice().sort((x, y) => x.full_name.localeCompare(y.full_name)).map((x) => <option key={x.id} value={x.id}>{x.full_name}{x.city || x.country ? ` · ${[x.city, x.country].filter(Boolean).join(', ')}` : ''}</option>)}
+            </select>
+          </label>
+        )}
+        {usesContact && isNew && (
+          <div className="panel">
+            <label className="field"><span>Full name</span><input value={c.full_name} onChange={(e) => setField('full_name', e.target.value)} autoComplete="off" /></label>
+            <div className="grid2">
+              <label className="field"><span>Phone</span><input type="tel" value={c.phone} onChange={(e) => setField('phone', e.target.value)} /></label>
+              <label className="field"><span>Email</span><input type="email" value={c.email} onChange={(e) => setField('email', e.target.value)} /></label>
+            </div>
+            <label className="field"><span>Address</span><textarea rows={2} value={c.address} onChange={(e) => setField('address', e.target.value)} /></label>
+            <div className="grid2">
+              <label className="field"><span>City</span><input value={c.city} onChange={(e) => setField('city', e.target.value)} /></label>
+              <label className="field"><span>Country</span><input value={c.country} onChange={(e) => setField('country', e.target.value)} placeholder="e.g. Qatar, UK" /></label>
+            </div>
           </div>
         )}
-        {['adopted', 'transferred'].includes(status) && (
-          <label className="field"><span>Country · optional</span><input value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Qatar, UK, Canada" /></label>
+        {picked && <span className="t13">{[picked.phone, picked.email, [picked.city, picked.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')} · <Link to={`/contacts/${picked.id}`}>Edit details</Link></span>}
+        {!usesContact && status !== 'shelter' && status !== 'deceased' && (
+          <label className="field"><span>Where / who · optional</span><input value={withName} onChange={(e) => setWithName(e.target.value)} placeholder="e.g. PAWS UK, Heathrow" /></label>
         )}
         <label className="field"><span>Date</span><input type="date" value={on} max={today()} onChange={(e) => setOn(e.target.value)} /></label>
         {backdated && <span className="note">This is earlier than the latest entry ({fmt(latest.from_on)}), so it's added to the history without changing where {a.name} is now.</span>}
         <label className="field"><span>Note · optional</span><input value={note} onChange={(e) => setNote(e.target.value)} /></label>
-        <button className="btn" disabled={needsWho && !withName.trim()} onClick={save}>{needsWho && !withName.trim() ? 'Add who they are with' : 'Save move'}</button>
+        <button className="btn" disabled={!whoOk} onClick={save}>{whoOk ? 'Save move' : 'Choose who they are with'}</button>
       </section>
       <section className="card tight">
         <h2 className="h" style={{ paddingBottom: 6 }}>Where {a.name} has been</h2>
@@ -481,13 +590,25 @@ function Where({ a }: { a: Row }) {
                 <span className="chip" style={{ background: s.bg, color: s.fg }}>{s.label}{l.status === 'shelter' && code(l.kennel_id) ? ` · ${code(l.kennel_id)}` : ''}</span>
                 <span className="t13">{fmt(l.from_on)}{until ? ` – ${fmt(until)}` : ' – now'}</span>
               </div>
-              {(l.with_name || l.country) && <span className="t14">{[l.with_name, l.with_contact, l.country].filter(Boolean).join(' · ')}</span>}
+              {l.contact_id
+                ? <ContactLine id={l.contact_id} fallback={l.with_name} />
+                : (l.with_name || l.country) && <span className="t14">{[l.with_name, l.with_contact, l.country].filter(Boolean).join(' · ')}</span>}
               <span className="t13">{[l.note, l.created_by ? name(l.created_by) : ''].filter(Boolean).join(' · ')}</span>
             </div>
           );
         })}
       </section>
     </>
+  );
+}
+
+function ContactLine({ id, fallback }: { id: string; fallback: string }) {
+  const p = useTable('contacts').find((x) => x.id === id);
+  if (!p) return <span className="t14">{fallback}</span>;
+  return (
+    <Link to={`/contacts/${p.id}`} className="t14" style={{ color: 'inherit' }}>
+      <b>{p.full_name}</b> ({CONTACT_KIND[p.kind]}) · {[p.phone, p.email, [p.city, p.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+    </Link>
   );
 }
 
