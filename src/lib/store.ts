@@ -86,6 +86,8 @@ function queries(userId: string, isMgmt: boolean) {
     eod_signoffs: () => supabase.from('eod_signoffs').select('*').gte('work_on', since30),
     petty_cash_issues: () => supabase.from('petty_cash_issues').select('*').order('created_at'),
     petty_cash_spends: () => supabase.from('petty_cash_spends').select('*').order('created_at'),
+    cash_donations: () => supabase.from('cash_donations').select('*').order('created_at'),
+    donation_transfers: () => (isMgmt ? supabase.from('donation_transfers').select('*').order('created_at') : Promise.resolve({ data: [], error: null })),
   };
   return q;
 }
@@ -274,7 +276,7 @@ let timer: any = null;
 function startRealtime() {
   if (channel) return;
   channel = supabase.channel('paws-live');
-  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements'];
+  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements', 'cash_donations', 'donation_transfers'];
   live.forEach((t) =>
     channel!.on('postgres_changes' as any, { event: '*', schema: 'public', table: t }, () => {
       pending.add(t);
