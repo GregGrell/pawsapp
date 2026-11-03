@@ -18,6 +18,7 @@ export const KIND_LABEL: Record<string, string> = {
   worming: 'Worming',
   flea_tick: 'Flea & tick',
   ratt: 'RATT',
+  test: 'Disease test',
   other: 'Other',
 };
 
@@ -91,7 +92,7 @@ export const FIELD_LABEL: Record<string, string> = {
   name: 'Name', species: 'Species', breed: 'Breed', colour: 'Colour', sex: 'Sex', dob: 'Date of birth', dob_estimated: 'DOB estimated',
   neutered: 'Neutered', microchip: 'Microchip', microchip_on: 'Chip inserted', status: 'Status', status_since: 'Status since',
   intake_on: 'Intake date', notes: 'Notes', photo_path: 'Main photo', kennel_id: 'Kennel', given_on: 'Given', next_due_on: 'Next due',
-  product: 'Product', batch: 'Batch', vet: 'Vet', result: 'Result', certificate_path: 'Certificate', title: 'Title', body: 'Details',
+  product: 'Product', manufacturer: 'Manufacturer', batch: 'Batch', vet: 'Vet', result: 'Result', certificate_path: 'Certificate', title: 'Title', body: 'Details',
   noted_on: 'Date', file_path: 'File', with_name: 'With', with_contact: 'Contact', country: 'Country', from_on: 'From', note: 'Note',
   instructions: 'Dose / when', active: 'Active', started_on: 'Started', ended_on: 'Stopped', caption: 'Caption', kind: 'Type',
   reason: 'Reason', destination: 'Going to', returned_at: 'Returned', type_id: 'Treatment',
@@ -101,3 +102,17 @@ export const TABLE_LABEL: Record<string, string> = {
   animals: 'Profile', animal_locations: 'Location', treatments: 'Treatment', medical_notes: 'Medical note',
   animal_files: 'Photo / file', medications: 'Medication', animal_movements: 'Sign-out',
 };
+
+/** Structured results for disease tests. Stored as text, e.g. "FIV negative · FeLV negative". */
+export const TEST_PARTS: Record<string, string[]> = {
+  'FIV/FeLV test': ['FIV', 'FeLV'],
+  'Quad test (4Dx)': ['Heartworm', 'Lyme', 'Ehrlichia', 'Anaplasma'],
+};
+export const testParts = (name: string) => TEST_PARTS[name] ?? null;
+export const isPositive = (result?: string) => /positive/i.test(result ?? '');
+
+/** Latest given entry matching a test. */
+export function latestGiven(treatments: Row[], match: (t: Row) => boolean) {
+  return treatments.filter((t) => t.given_on && match(t)).sort((a, b) => b.given_on.localeCompare(a.given_on) || b.created_at.localeCompare(a.created_at))[0] ?? null;
+}
+export const isRabies = (t: Row) => t.kind === 'vaccine' && /rabies/i.test(t.name);

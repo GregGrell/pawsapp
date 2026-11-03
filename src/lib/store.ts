@@ -71,6 +71,7 @@ function queries(userId: string, isMgmt: boolean, role = '') {
     treatment_types: () => supabase.from('treatment_types').select('*').order('sort'),
     medical_notes: () => supabase.from('medical_notes').select('*').order('noted_on'),
     animal_files: () => supabase.from('animal_files').select('*').order('created_at'),
+    flight_lists: () => supabase.from('flight_lists').select('*').order('created_at'),
     kennel_logs: () => supabase.from('kennel_logs').select('*').gte('created_at', `${since7}T00:00:00+03:00`).order('created_at'),
     calendar_items: () => supabase.from('calendar_items').select('*').eq('active', true),
     task_completions: () => supabase.from('task_completions').select('*').gte('occurs_on', since30),
@@ -95,7 +96,7 @@ function queries(userId: string, isMgmt: boolean, role = '') {
     donation_transfers: () => (isMgmt ? supabase.from('donation_transfers').select('*').order('created_at') : Promise.resolve({ data: [], error: null })),
   };
   if (role === 'records') {
-    const keep = ['profiles', 'kennels', 'animals', 'medications', 'animal_locations', 'treatments', 'treatment_types', 'medical_notes', 'animal_files'];
+    const keep = ['profiles', 'kennels', 'animals', 'medications', 'animal_locations', 'treatments', 'treatment_types', 'medical_notes', 'animal_files', 'flight_lists'];
     for (const k of Object.keys(q)) if (!keep.includes(k)) delete q[k];
   }
   return q;
@@ -297,7 +298,7 @@ let timer: any = null;
 function startRealtime() {
   if (channel) return;
   channel = supabase.channel('paws-live');
-  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements', 'cash_donations', 'donation_transfers', 'animals', 'animal_locations', 'treatments', 'medical_notes', 'animal_files', 'medications', 'treatment_types'];
+  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements', 'cash_donations', 'donation_transfers', 'animals', 'animal_locations', 'treatments', 'medical_notes', 'animal_files', 'medications', 'treatment_types', 'flight_lists'];
   live.forEach((t) =>
     channel!.on('postgres_changes' as any, { event: '*', schema: 'public', table: t }, () => {
       pending.add(t);

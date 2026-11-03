@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { Empty, Page, Pill, PhotoPicker, StoredImage, toast } from '../components/ui';
-import { FIELD_LABEL, KIND_LABEL, SEX_LABEL, STATUS, STATUS_ORDER, TABLE_LABEL, ageText, careDue, typesFor } from '../lib/animals';
+import { FIELD_LABEL, KIND_LABEL, SEX_LABEL, STATUS, STATUS_ORDER, TABLE_LABEL, ageText, careDue, isPositive, latestGiven, testParts, typesFor } from '../lib/animals';
 import { useProfiles, useTable } from '../lib/hooks';
 import { insert, queueUpload, remove, update, type Row } from '../lib/store';
 import { supabase } from '../lib/supabase';
@@ -31,6 +31,7 @@ export default function AnimalRecord() {
           <span className="chip" style={{ background: s.bg, color: s.fg }}>{s.label}{a.status === 'shelter' && kennel ? ` · ${kennel}` : ''}</span>
           <span className="t13">Since {fmt(a.status_since)}</span>
           <span className="t13" style={{ fontVariantNumeric: 'tabular-nums' }}>{a.microchip ? `Chip ${a.microchip}` : 'No microchip recorded'}</span>
+          <TestSummary a={a} />
         </div>
       </section>
       <div className="pills" role="tablist">
@@ -44,6 +45,19 @@ export default function AnimalRecord() {
       {tab === 'photos' && <Files a={a} />}
       {tab === 'history' && <History a={a} />}
     </Page>
+  );
+}
+
+function TestSummary({ a }: { a: Row }) {
+  const tr = useTable('treatments').filter((t) => t.animal_id === a.id);
+  const name = a.species === 'cat' ? 'FIV/FeLV test' : 'Quad test (4Dx)';
+  const t = latestGiven(tr, (x) => x.kind === 'test' && x.name === name);
+  if (!t) return <span className="t13">{a.species === 'cat' ? 'FIV/FeLV' : 'Quad test'}: not recorded</span>;
+  const pos = isPositive(t.result);
+  return (
+    <span className="t13" style={pos ? { color: 'var(--red)', fontWeight: 700 } : undefined}>
+      {a.species === 'cat' ? 'FIV/FeLV' : 'Quad'} {fmt(t.given_on)}: {t.result || 'no result recorded'}
+    </span>
   );
 }
 
@@ -130,7 +144,7 @@ function Care({ a }: { a: Row }) {
             <div key={t.id} className="row" style={{ alignItems: 'center' }}>
               <div className="grow">
                 <span className="t15">{t.name}</span>
-                <span className="t13">{last ? `Last ${fmt(last.given_on)}${last.product ? ` · ${last.product}` : ''}` : 'No record yet'}</span>
+                <span className="t13" style={last && t.kind === 'test' && isPositive(last.result) ? { color: 'var(--red)', fontWeight: 700 } : undefined}>{last ? `${t.kind === 'test' ? 'Tested' : 'Last'} ${fmt(last.given_on)}${t.kind === 'test' ? ` · ${last.result || 'no result'}` : last.product ? ` · ${last.product}` : ''}` : 'No record yet'}</span>
                 {d && <span className="t13" style={over ? { color: 'var(--red)', fontWeight: 700 } : soon ? { color: 'var(--amber)', fontWeight: 700 } : undefined}>{over ? 'Overdue since' : 'Due'} {fmt(d.due)}</span>}
               </div>
               <button className={`btn sm ${d && (over || soon) ? '' : 'ghost'}`} style={{ flex: '0 0 auto' }} onClick={() => setAdding({ type: t, prefill: last })}>{d && (over || soon) ? 'Done' : 'Log'}</button>
@@ -165,7 +179,7 @@ function Care({ a }: { a: Row }) {
               <div className="grow">
                 <span className="t15">{t.name}{t.given_on ? '' : ' · reminder only'}</span>
                 <span className="t13">{t.given_on ? `Given ${fmt(t.given_on)}` : ''}{t.next_due_on ? `${t.given_on ? ' · ' : ''}next due ${fmt(t.next_due_on)}` : ''}</span>
-                <span className="t13">{[t.product, t.batch && `batch ${t.batch}`, t.vet, t.result && `result ${t.result}`, name(t.created_by)].filter(Boolean).join(' · ')}</span>
+                <span className="t13" style={isPositive(t.result) ? { color: 'var(--red)', fontWeight: 700 } : undefined}>{[t.product, t.manufacturer, t.batch && `batch ${t.batch}`, t.vet, t.result && `result ${t.result}`, name(t.created_by)].filter(Boolean).join(' · ')}</span>
                 {t.notes && <span className="t13" style={{ fontStyle: 'italic' }}>{t.notes}</span>}
               </div>
               {t.certificate_path && <button className="chip" style={{ background: 'var(--blue-wash)', color: 'var(--blue-dark)', border: 0, cursor: 'pointer', flex: '0 0 auto' }} onClick={() => setOpen(open === t.id ? null : t.id)}>Certificate {open === t.id ? '▴' : '▾'}</button>}
@@ -190,6 +204,8 @@ function TreatmentForm({ a, type, prefill, onDone }: { a: Row; type: Row | null;
   const [reminderOnly, setReminderOnly] = useState(false);
   const [product, setProduct] = useState(prefill?.product ?? '');
   const [batch, setBatch] = useState('');
+  const [manufacturer, setManufacturer] = useState(prefill?.manufacturer ?? '');
+  const [parts, setParts] = useState<Record<string, string>>({});
   const [vet, setVet] = useState(prefill?.vet ?? '');
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
@@ -200,13 +216,15 @@ function TreatmentForm({ a, type, prefill, onDone }: { a: Row; type: Row | null;
   useEffect(() => { if (!dueTouched) setDue(autoDue); }, [autoDue, dueTouched]);
   const kind = t?.kind ?? otherKind;
   const label = t?.name ?? other.trim();
+  const partNames = testParts(label);
+  const resultText = partNames ? partNames.filter((p) => parts[p]).map((p) => `${p} ${parts[p]}`).join(' · ') : result.trim();
   const ok = label && (reminderOnly ? !!due : !!given);
 
   const save = () => {
     const certificate_path = cert ? queueUpload('photos', cert, 'animals') : null;
     insert('treatments', {
       animal_id: a.id, type_id: t?.id ?? null, kind, name: label, given_on: reminderOnly ? null : given, next_due_on: due || null,
-      product: product.trim(), batch: batch.trim(), vet: vet.trim(), result: result.trim(), notes: notes.trim(), certificate_path,
+      product: product.trim(), manufacturer: manufacturer.trim(), batch: batch.trim(), vet: vet.trim(), result: resultText, notes: notes.trim(), certificate_path,
       created_by: me.id, created_at: nowIso(),
     });
     toast(reminderOnly ? `Reminder set for ${fmt(due)}` : `${label} logged${due ? ` · next due ${fmt(due)}` : ''}`);
@@ -236,19 +254,35 @@ function TreatmentForm({ a, type, prefill, onDone }: { a: Row; type: Row | null;
         <button type="button" className="seg" aria-pressed={reminderOnly} onClick={() => setReminderOnly(true)}>Just set a due date</button>
       </div>
       <div className="grid2">
-        {!reminderOnly && <label className="field"><span>{kind === 'ratt' ? 'Blood sample date' : 'Given on'}</span><input type="date" value={given} max={today()} onChange={(e) => setGiven(e.target.value)} /></label>}
+        {!reminderOnly && <label className="field"><span>{kind === 'ratt' ? 'Blood draw date' : kind === 'test' ? 'Test date' : 'Given on'}</span><input type="date" value={given} max={today()} onChange={(e) => setGiven(e.target.value)} /></label>}
         <label className="field"><span>Next due{t?.interval_days && !reminderOnly ? ' · auto' : ''}</span><input type="date" value={due} onChange={(e) => { setDue(e.target.value); setDueTouched(true); }} /></label>
       </div>
       {!reminderOnly && (
         <>
-          <div className="grid2">
-            <label className="field"><span>Product · optional</span><input value={product} onChange={(e) => setProduct(e.target.value)} placeholder="e.g. Nobivac Rabies" /></label>
-            <label className="field"><span>Batch · optional</span><input value={batch} onChange={(e) => setBatch(e.target.value)} /></label>
-          </div>
+          {partNames && (
+            <div className="field">
+              <span>Result</span>
+              {partNames.map((p) => (
+                <div key={p} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span className="t14" style={{ width: 90, fontWeight: 700 }}>{p}</span>
+                  <div className="pills">
+                    {['negative', 'positive', 'inconclusive'].map((r) => <Pill key={r} on={parts[p] === r} onClick={() => setParts((x) => ({ ...x, [p]: x[p] === r ? '' : r }))}>{r[0].toUpperCase() + r.slice(1)}</Pill>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {kind !== 'test' && (
+            <div className="grid2">
+              <label className="field"><span>Product · optional</span><input value={product} onChange={(e) => setProduct(e.target.value)} placeholder={kind === 'worming' ? 'e.g. Drontal Plus' : 'e.g. Nobivac Rabies'} /></label>
+              <label className="field"><span>Batch · optional</span><input value={batch} onChange={(e) => setBatch(e.target.value)} /></label>
+            </div>
+          )}
+          {kind === 'vaccine' && <label className="field"><span>Manufacturer · optional</span><input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="e.g. MSD Animal Health" /></label>}
           <label className="field"><span>Vet / clinic · optional</span><input value={vet} onChange={(e) => setVet(e.target.value)} /></label>
-          {kind === 'ratt' && <label className="field"><span>Result · optional</span><input value={result} onChange={(e) => setResult(e.target.value)} placeholder="e.g. 2.5 IU/ml" /></label>}
+          {(kind === 'ratt' || (kind === 'test' && !partNames)) && <label className="field"><span>Result · optional</span><input value={result} onChange={(e) => setResult(e.target.value)} placeholder="e.g. 2.5 IU/ml" /></label>}
           <div className="field">
-            <span>{kind === 'ratt' ? 'RATT certificate' : 'Certificate / vet record'}</span>
+            <span>{kind === 'ratt' ? 'RATT certificate' : kind === 'test' ? 'Test result / lab report' : 'Certificate / vet record'}</span>
             <PhotoPicker value={cert} onChange={setCert} label="Photo or PDF" accept="image/*,application/pdf" />
           </div>
         </>

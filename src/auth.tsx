@@ -127,7 +127,7 @@ function Login() {
         <img src="./logo.png" alt="PAWS Rescue Qatar" width={130} />
         <form className="login" onSubmit={go}>
           <h1 className="title" style={{ fontSize: 24, textAlign: 'center' }}>
-            {mode === 'in' ? 'Sign in to PAWSapp' : mode === 'up' ? 'Create your account' : 'Reset password'}
+            {mode === 'in' ? (location.hash.startsWith('#/records') || location.hash.startsWith('#/flight-lists') ? 'PAWS animal records' : 'Sign in to PAWSapp') : mode === 'up' ? 'Create your account' : 'Reset password'}
           </h1>
           {mode === 'up' && (
             <label className="field"><span>Your name</span><input required value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" /></label>

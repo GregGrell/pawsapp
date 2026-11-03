@@ -88,7 +88,12 @@ export default function Records() {
 
   return (
     <Page title="Animal records" sub={`${counts.dog} dogs · ${counts.cat} cats in our care · ${animals.length} records`}
-      right={<button className="btn sm" onClick={() => setAdding(!adding)}><Icon name="plus" size={16} color="#fff" width={2.4} /> Add</button>}>
+      right={
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link className="btn ghost sm" to="/flight-lists">Flight lists</Link>
+          <button className="btn sm" onClick={() => setAdding(!adding)}><Icon name="plus" size={16} color="#fff" width={2.4} /> Add</button>
+        </div>
+      }>
       {adding && <AddAnimal onDone={(id) => { setAdding(false); if (id) nav(`/records/${id}`); }} />}
 
       <section className="card">
