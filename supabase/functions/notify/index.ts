@@ -121,6 +121,27 @@ async function runSchedule() {
     log.push('morning');
   }
 
+  // Morning: animal care due today or overdue (vaccinations, worming, flea & tick)
+  if (now >= morning && now < morning + 180) {
+    const { data: tr } = await admin.from('treatments').select('animal_id, type_id, name, given_on, next_due_on, created_at');
+    const { data: an } = await admin.from('animals').select('id, name, status').in('status', ['shelter', 'foster', 'trial']);
+    const names = new Map((an ?? []).map((a) => [a.id, a.name]));
+    const latest = new Map<string, any>();
+    for (const t of tr ?? []) {
+      if (!names.has(t.animal_id)) continue;
+      const k = `${t.animal_id}|${t.type_id ?? t.name}`;
+      const c = latest.get(k);
+      const tk = t.given_on ?? t.next_due_on;
+      const ck = c ? c.given_on ?? c.next_due_on : '';
+      if (!c || tk > ck || (tk === ck && t.created_at > c.created_at)) latest.set(k, t);
+    }
+    const due = [...latest.values()].filter((t) => t.next_due_on && t.next_due_on <= day);
+    if (due.length && (await once(`care:${day}`))) {
+      await sendTo('all', { title: `Care due: ${due.length}`, body: due.slice(0, 6).map((t) => `${names.get(t.animal_id)} · ${t.name}`).join(' · '), url: '#/', tag: `care-${day}` });
+      log.push('care due');
+    }
+  }
+
   // End-of-day check not signed off
   if (now >= eodAt) {
     const { data: so } = await admin.from('eod_signoffs').select('id').eq('work_on', day).maybeSingle();

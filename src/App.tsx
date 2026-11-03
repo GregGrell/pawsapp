@@ -23,6 +23,10 @@ import SiteReport from './pages/SiteReport';
 import AnimalOut from './pages/AnimalOut';
 import VolunteerHome, { VolunteerMore } from './pages/VolunteerHome';
 import { useAuth } from './auth';
+import Records from './pages/Records';
+import AnimalRecord from './pages/AnimalRecord';
+import TreatmentTypes from './pages/TreatmentTypes';
+import RecordsMore from './pages/RecordsMore';
 
 export default function App() {
   return (
@@ -45,6 +49,19 @@ export default function App() {
 function Shell() {
   const loc = useLocation();
   const { me } = useAuth();
+  if (me.role === 'records')
+    return (
+      <div className="app wide">
+        <Stripe />
+        <Routes>
+          <Route path="/records/:id" element={<AnimalRecord />} />
+          <Route path="/more" element={<RecordsMore />} />
+          <Route path="*" element={<Records />} />
+        </Routes>
+        <Nav path={loc.pathname} tabs={REC_TABS} morePaths={['/more']} />
+        <Toaster />
+      </div>
+    );
   if (me.role === 'volunteer')
     return (
       <div className="app">
@@ -62,7 +79,7 @@ function Shell() {
       </div>
     );
   return (
-    <div className="app">
+    <div className={`app${loc.pathname.startsWith('/records') ? ' wide' : ''}`}>
       <Stripe />
       <Routes>
         <Route path="/" element={<Today />} />
@@ -83,6 +100,9 @@ function Shell() {
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/site-report" element={<SiteReport />} />
         <Route path="/animal-out" element={<AnimalOut />} />
+        <Route path="/records" element={<Records />} />
+        <Route path="/records/:id" element={<AnimalRecord />} />
+        <Route path="/treatment-types" element={<TreatmentTypes />} />
         <Route path="*" element={<Today />} />
       </Routes>
       <Nav path={loc.pathname} tabs={TABS} morePaths={MORE_PATHS} />
@@ -99,7 +119,11 @@ const TABS = [
   { to: '/cash', icon: 'cash', label: 'Petty cash' },
   { to: '/more', icon: 'more', label: 'More' },
 ];
-const MORE_PATHS = ['/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
+const REC_TABS = [
+  { to: '/', icon: 'heart', label: 'Animals' },
+  { to: '/more', icon: 'more', label: 'More' },
+];
+const MORE_PATHS = ['/records', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
 const VOL_TABS = [
   { to: '/', icon: 'home', label: 'Today' },
   { to: '/animal-out', icon: 'suitcase', label: 'Animals' },
@@ -112,7 +136,7 @@ function Nav({ path, tabs, morePaths }: { path: string; tabs: typeof TABS; moreP
   return (
     <nav className="nav" aria-label="Main" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
       {tabs.map((t) => {
-        const active = t.to === '/more' ? morePaths.includes(path) : t.to === '/' ? path === '/' || path === '/eod' : path === t.to;
+        const active = t.to === '/more' ? morePaths.some((m) => path === m || path.startsWith(m + '/')) : t.to === '/' ? path === '/' || path === '/eod' || (tabs === REC_TABS && path.startsWith('/records')) : path === t.to;
         return (
           <NavLink key={t.to} to={t.to} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>
             <Icon name={t.icon} size={22} width={active ? 2.2 : 1.8} />

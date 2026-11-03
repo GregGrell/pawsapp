@@ -4,7 +4,7 @@ import { supabase } from './lib/supabase';
 import { boot, clearLocal } from './lib/store';
 import { Stripe } from './components/ui';
 
-type Profile = { id: string; full_name: string; email: string; role: 'staff' | 'management' | 'volunteer'; active: boolean };
+type Profile = { id: string; full_name: string; email: string; role: 'staff' | 'management' | 'volunteer' | 'records'; active: boolean };
 type Ctx = { session: Session; me: Profile; isMgmt: boolean; signOut: () => Promise<void> };
 const AuthCtx = createContext<Ctx | null>(null);
 export const useAuth = () => useContext(AuthCtx)!;
@@ -50,7 +50,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (session && me?.active && me.id === session.user.id && !booted) {
       setBooted(true);
-      boot(me.id, me.role === 'management');
+      boot(me.id, me.role === 'management', me.role);
     }
   }, [session, me, booted]);
 

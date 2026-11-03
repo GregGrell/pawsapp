@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { Empty, Icon, Page, toast } from '../components/ui';
 import { useTable } from '../lib/hooks';
@@ -13,7 +14,7 @@ export default function Kennels() {
   const { isMgmt } = useAuth();
   const [sp, setSp] = useState<Sp>('dog');
   const kennels = useTable('kennels').filter((k) => k.active);
-  const animals = useTable('animals');
+  const animals = useTable('animals').filter((a) => a.in_shelter);
   if (!isMgmt) return <Page title="Kennels" back="More"><Empty>Only management can change kennels and animals.</Empty></Page>;
   return (
     <Page title="Kennels & animals" back="More">
@@ -28,7 +29,7 @@ export default function Kennels() {
       <ShelterluvPanel />
       <KennelList sp={sp} kennels={kennels.filter((k) => k.species === sp)} />
       <AnimalList sp={sp} animals={animals.filter((a) => a.species === sp)} kennels={kennels.filter((k) => k.species === sp)} />
-      <p className="note">Changes reach everyone's kennel log straight away. Animals from Shelterluv are marked "Shelterluv"; anything added here by hand stays as a manual entry.</p>
+      <p className="note">Changes reach everyone's kennel log straight away. Medication, vaccinations and everything else are on each animal's record.</p>
     </Page>
   );
 }
@@ -81,13 +82,16 @@ function KennelTile({ k }: { k: Row }) {
 
 function AnimalList({ sp, animals, kennels }: { sp: Sp; animals: Row[]; kennels: Row[] }) {
   const [adding, setAdding] = useState('');
-  const [open, setOpen] = useState<string | null>(null);
   return (
     <section className="card tight">
       <h2 className="h" style={{ paddingBottom: 8 }}>{sp === 'dog' ? 'Dogs' : 'Cats'} in the shelter</h2>
       <div style={{ display: 'flex', gap: 8, paddingBottom: 8 }}>
         <input className="input" placeholder={`Add a ${sp} by name`} value={adding} onChange={(e) => setAdding(e.target.value)} />
-        <button className="btn" disabled={!adding.trim()} onClick={() => { insert('animals', { name: adding.trim(), species: sp, in_shelter: true, source: 'manual', updated_at: new Date().toISOString() }); setAdding(''); }}>
+        <button className="btn" disabled={!adding.trim()} onClick={() => {
+          const a = insert('animals', { name: adding.trim(), species: sp, status: 'shelter', in_shelter: true, source: 'manual', breed: '', colour: '', sex: 'unknown', microchip: '', notes: '', intake_on: today(), status_since: today(), updated_at: new Date().toISOString() });
+          insert('animal_locations', { animal_id: a.id, status: 'shelter', kennel_id: null, with_name: '', with_contact: '', country: '', from_on: today(), note: 'Record started', created_at: new Date().toISOString() });
+          setAdding('');
+        }}>
           <Icon name="plus" size={18} color="#fff" width={2.4} />
         </button>
       </div>
@@ -96,60 +100,19 @@ function AnimalList({ sp, animals, kennels }: { sp: Sp; animals: Row[]; kennels:
         <div key={a.id} className="row" style={{ flexDirection: 'column', gap: 8 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%' }}>
             <span className="t15" style={{ flex: 1 }}>{a.name}{a.source === 'shelterluv' ? <span className="t13"> · Shelterluv</span> : null}</span>
-            <select className="input" style={{ width: 96 }} aria-label={`${a.name}'s kennel`} value={a.kennel_id ?? ''} onChange={(e) => update('animals', { id: a.id }, { kennel_id: e.target.value || null })}>
+            <select className="input" style={{ width: 96 }} aria-label={`${a.name}'s kennel`} value={a.kennel_id ?? ''} onChange={(e) => {
+              const kennel_id = e.target.value || null;
+              insert('animal_locations', { animal_id: a.id, status: 'shelter', kennel_id, with_name: '', with_contact: '', country: '', from_on: today(), note: 'Kennel change', created_at: new Date().toISOString() });
+              update('animals', { id: a.id }, { kennel_id });
+            }}>
               <option value="">—</option>
               {kennels.map((k) => <option key={k.id} value={k.id}>{k.code}</option>)}
             </select>
-            <button className="btn ghost sm" onClick={() => setOpen(open === a.id ? null : a.id)}>{open === a.id ? 'Close' : 'Meds'}</button>
+            <Link className="btn ghost sm" to={`/records/${a.id}`}>Record</Link>
           </div>
-          {open === a.id && <AnimalDetail a={a} />}
         </div>
       ))}
     </section>
-  );
-}
-
-function AnimalDetail({ a }: { a: Row }) {
-  const meds = useTable('medications').filter((m) => m.animal_id === a.id);
-  const vacc = useTable('vaccines_due').filter((v) => v.animal_id === a.id);
-  const [med, setMed] = useState('');
-  const [instr, setInstr] = useState('');
-  const [vName, setVName] = useState('');
-  const [vDue, setVDue] = useState(today());
-  return (
-    <div className="panel" style={{ width: '100%' }}>
-      <strong style={{ fontSize: 15 }}>Current medication</strong>
-      {!meds.length && <span className="t14">None.</span>}
-      {meds.map((m) => (
-        <div key={m.id} className="head">
-          <span className="t14"><b>{m.name}</b>{m.instructions ? ` · ${m.instructions}` : ''}</span>
-          <button className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => update('medications', { id: m.id }, { active: false })}>Stop</button>
-        </div>
-      ))}
-      <div className="grid2">
-        <input className="input" placeholder="Medicine + strength" value={med} onChange={(e) => setMed(e.target.value)} />
-        <input className="input" placeholder="Dose / when" value={instr} onChange={(e) => setInstr(e.target.value)} />
-      </div>
-      <button className="btn outline sm" disabled={!med.trim()} onClick={() => { insert('medications', { animal_id: a.id, name: med.trim(), instructions: instr.trim(), active: true, source: 'manual' }); setMed(''); setInstr(''); }}>Add medication</button>
-
-      <strong style={{ fontSize: 15, paddingTop: 6 }}>Vaccines due</strong>
-      {!vacc.length && <span className="t14">None in the next 14 days.</span>}
-      {vacc.map((v) => (
-        <div key={v.id} className="head">
-          <span className="t14"><b>{v.vaccine}</b> · {shortDate(v.due_on)}</span>
-          <button className="btn link sm" style={{ color: 'var(--blue)' }} onClick={() => update('vaccines_due', { id: v.id }, { done: true })}>Given</button>
-        </div>
-      ))}
-      <div className="grid2">
-        <input className="input" placeholder="Vaccine" value={vName} onChange={(e) => setVName(e.target.value)} />
-        <input className="input" type="date" value={vDue} onChange={(e) => setVDue(e.target.value)} />
-      </div>
-      <button className="btn outline sm" disabled={!vName.trim()} onClick={() => { insert('vaccines_due', { animal_id: a.id, vaccine: vName.trim(), due_on: vDue, done: false, source: 'manual' }); setVName(''); }}>Add vaccine due date</button>
-
-      <button className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => confirm(`Mark ${a.name} as no longer in the shelter?`) && update('animals', { id: a.id }, { in_shelter: false })}>
-        {a.name} has left the shelter
-      </button>
-    </div>
   );
 }
 

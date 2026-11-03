@@ -13,7 +13,8 @@ type Op =
   | { id: string; type: 'insert'; table: string; row: Row }
   | { id: string; type: 'update'; table: string; match: Row; patch: Row }
   | { id: string; type: 'upsert'; table: string; row: Row; onConflict: string }
-  | { id: string; type: 'upload'; bucket: string; path: string; blob: Blob };
+  | { id: string; type: 'upload'; bucket: string; path: string; blob: Blob }
+  | { id: string; type: 'delete'; table: string; match: Row };
 
 type State = {
   tables: Tables;
@@ -55,7 +56,7 @@ export function getState() {
 }
 
 // ---------- what we load ----------
-function queries(userId: string, isMgmt: boolean) {
+function queries(userId: string, isMgmt: boolean, role = '') {
   const d = today();
   const since30 = addDays(d, -30);
   const since7 = addDays(d, -7);
@@ -63,9 +64,13 @@ function queries(userId: string, isMgmt: boolean) {
     profiles: () => supabase.from('profiles').select('*').order('full_name'),
     app_settings: () => supabase.from('app_settings').select('*'),
     kennels: () => supabase.from('kennels').select('*').order('species').order('sort'),
-    animals: () => supabase.from('animals').select('*').eq('in_shelter', true).order('name'),
-    medications: () => supabase.from('medications').select('*').eq('active', true),
-    vaccines_due: () => supabase.from('vaccines_due').select('*').eq('done', false).lte('due_on', addDays(d, 14)).order('due_on'),
+    animals: () => supabase.from('animals').select('*').order('name'),
+    medications: () => supabase.from('medications').select('*'),
+    animal_locations: () => supabase.from('animal_locations').select('*').order('from_on'),
+    treatments: () => supabase.from('treatments').select('*').order('given_on'),
+    treatment_types: () => supabase.from('treatment_types').select('*').order('sort'),
+    medical_notes: () => supabase.from('medical_notes').select('*').order('noted_on'),
+    animal_files: () => supabase.from('animal_files').select('*').order('created_at'),
     kennel_logs: () => supabase.from('kennel_logs').select('*').gte('created_at', `${since7}T00:00:00+03:00`).order('created_at'),
     calendar_items: () => supabase.from('calendar_items').select('*').eq('active', true),
     task_completions: () => supabase.from('task_completions').select('*').gte('occurs_on', since30),
@@ -89,13 +94,17 @@ function queries(userId: string, isMgmt: boolean) {
     cash_donations: () => supabase.from('cash_donations').select('*').order('created_at'),
     donation_transfers: () => (isMgmt ? supabase.from('donation_transfers').select('*').order('created_at') : Promise.resolve({ data: [], error: null })),
   };
+  if (role === 'records') {
+    const keep = ['profiles', 'kennels', 'animals', 'medications', 'animal_locations', 'treatments', 'treatment_types', 'medical_notes', 'animal_files'];
+    for (const k of Object.keys(q)) if (!keep.includes(k)) delete q[k];
+  }
   return q;
 }
 
-let ctx: { userId: string; isMgmt: boolean } | null = null;
+let ctx: { userId: string; isMgmt: boolean; role: string } | null = null;
 
-export async function boot(userId: string, isMgmt: boolean) {
-  ctx = { userId, isMgmt };
+export async function boot(userId: string, isMgmt: boolean, role = '') {
+  ctx = { userId, isMgmt, role };
   const [snap, outbox] = await Promise.all([get(SNAP_KEY), get(OUTBOX_KEY)]);
   const cached = snap && snap.userId === userId ? snap : null;
   setState({
@@ -125,7 +134,7 @@ async function persist() {
 
 export async function refresh(only?: string[]) {
   if (!ctx) return;
-  const q = queries(ctx.userId, ctx.isMgmt);
+  const q = queries(ctx.userId, ctx.isMgmt, ctx.role);
   const names = only ?? Object.keys(q);
   const results = await Promise.all(names.map((n) => q[n]()));
   const tables = { ...state.tables };
@@ -162,6 +171,9 @@ function applyLocal(tables: Tables, op: Op) {
   } else if (op.type === 'update') {
     const cols = Object.keys(op.match);
     for (let i = 0; i < list.length; i++) if (sameKey(list[i], op.match, cols)) list[i] = { ...list[i], ...op.patch };
+  } else if (op.type === 'delete') {
+    const cols = Object.keys(op.match);
+    tables[op.table] = list.filter((r) => !sameKey(r, op.match, cols));
   }
 }
 
@@ -184,6 +196,10 @@ export function insert(table: string, row: Row): Row {
 
 export function upsert(table: string, row: Row, onConflict: string) {
   enqueue([{ id: uid(), type: 'upsert', table, row, onConflict }]);
+}
+
+export function remove(table: string, match: Row) {
+  enqueue([{ id: uid(), type: 'delete', table, match }]);
 }
 
 export function update(table: string, match: Row, patch: Row) {
@@ -253,6 +269,11 @@ async function flush() {
         for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
         const r = await q;
         error = r.error;
+      } else if (op.type === 'delete') {
+        let q: any = supabase.from(op.table).delete();
+        for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
+        const r = await q;
+        error = r.error;
       }
     } catch (e) {
       error = e;
@@ -276,7 +297,7 @@ let timer: any = null;
 function startRealtime() {
   if (channel) return;
   channel = supabase.channel('paws-live');
-  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements', 'cash_donations', 'donation_transfers'];
+  const live = ['kennel_logs', 'calendar_items', 'task_completions', 'appointment_outcomes', 'requests', 'incidents', 'eod_signoffs', 'leave_requests', 'petty_cash_spends', 'petty_cash_issues', 'visitors', 'maintenance_issues', 'site_presence', 'out_of_hours', 'animal_movements', 'cash_donations', 'donation_transfers', 'animals', 'animal_locations', 'treatments', 'medical_notes', 'animal_files', 'medications', 'treatment_types'];
   live.forEach((t) =>
     channel!.on('postgres_changes' as any, { event: '*', schema: 'public', table: t }, () => {
       pending.add(t);
@@ -284,7 +305,8 @@ function startRealtime() {
       timer = setTimeout(() => {
         const names = [...pending];
         pending = new Set();
-        if (!state.outbox.length) refresh(names).catch(() => {});
+        const known = ctx ? Object.keys(queries(ctx.userId, ctx.isMgmt, ctx.role)) : [];
+        if (!state.outbox.length) refresh(names.filter((n) => known.includes(n))).catch(() => {});
       }, 400);
     }),
   );

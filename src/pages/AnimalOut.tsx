@@ -12,7 +12,7 @@ const QUICK = ['Vet appointment', 'Beach trip', 'Walk', 'Grooming', 'Photo shoot
 export default function AnimalOut() {
   const { me } = useAuth();
   const { name } = useProfiles();
-  const animals = useTable('animals');
+  const animals = useTable('animals').filter((a) => a.in_shelter);
   const kennels = useTable('kennels');
   const moves = useTable('animal_movements');
   const open = useOpenMoves();

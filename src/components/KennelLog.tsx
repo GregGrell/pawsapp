@@ -12,9 +12,11 @@ const PLURAL: Record<Species, string> = { dog: 'dogs', cat: 'cats' };
 
 export default function KennelLog() {
   const { me } = useAuth();
-  const animals = useTable('animals');
+  const all = useTable('animals');
+  const animals = useMemo(() => all.filter((a) => a.in_shelter), [all]);
   const kennels = useTable('kennels');
-  const meds = useTable('medications');
+  const allMeds = useTable('medications');
+  const meds = useMemo(() => allMeds.filter((m) => m.active && !m.ended_on), [allMeds]);
   const logs = useTable('kennel_logs');
   const { name } = useProfiles();
 

@@ -27,9 +27,10 @@ export default function Staff() {
         {waiting.map((p) => (
           <div key={p.id} className="row" style={{ flexDirection: 'column', gap: 8 }}>
             <div className="grow"><span className="t15">{p.full_name}</span><span className="t13">{p.email}</span></div>
-            <div className="btns" style={{ width: '100%' }}>
+            <div className="btns" style={{ width: '100%', flexWrap: 'wrap' }}>
               <button className="btn sm" onClick={() => { update('profiles', { id: p.id }, { active: true, role: 'staff' }); toast(`${p.full_name} approved as staff`); }}>Approve as staff</button>
               <button className="btn ghost sm" onClick={() => { update('profiles', { id: p.id }, { active: true, role: 'volunteer' }); toast(`${p.full_name} approved as volunteer`); }}>As volunteer</button>
+              <button className="btn ghost sm" onClick={() => { update('profiles', { id: p.id }, { active: true, role: 'records' }); toast(`${p.full_name} approved for animal records only`); }}>Records only</button>
               <button className="btn ghost sm" onClick={() => { update('profiles', { id: p.id }, { active: true, role: 'management' }); toast(`${p.full_name} approved as management`); }}>As management</button>
             </div>
           </div>
@@ -43,6 +44,7 @@ export default function Staff() {
             <div className="grow"><span className="t15">{p.full_name}{p.id === me.id ? ' (you)' : ''}</span><span className="t13">{p.email}</span></div>
             <select className="input" style={{ width: 150 }} value={p.role} disabled={p.id === me.id} aria-label={`${p.full_name}'s role`}
               onChange={(e) => { update('profiles', { id: p.id }, { role: e.target.value }); toast('Role updated'); }}>
+              <option value="records">Records only</option>
               <option value="volunteer">Volunteer</option>
               <option value="staff">Staff</option>
               <option value="management">Management</option>
@@ -53,7 +55,7 @@ export default function Staff() {
           </div>
         ))}
       </section>
-      <p className="note">Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
+      <p className="note">Records only is for the overseas adoption team: they see and update animal records, nothing else. Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
     </Page>
   );
 }

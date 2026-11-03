@@ -31,6 +31,10 @@ export default function More() {
       </section>
 
       <section className="card menu">
+        <Item to="/records" icon="heart" tint="#FCE7F3" color="#9D174D" label="Animal records" sub="Every animal: details, vaccinations, history" />
+      </section>
+
+      <section className="card menu">
         <Item to="/incidents" icon="alert" tint="var(--red-tint)" color="var(--red)" label="Incidents" sub="Report or review" badge={isMgmt ? openIncidents : 0} />
         <Item to="/animal-out" icon="suitcase" tint="#E8F0FC" color="#1E4E8C" label="Animal sign-outs" sub="Temporary trips and permanent moves" />
         <Item to="/maintenance" icon="wrench" tint="var(--amber-tint)" color="var(--amber)" label="Maintenance" sub="Report broken things with a photo" badge={openMaint} />
@@ -43,6 +47,7 @@ export default function More() {
         <section className="card menu">
           <span className="sect h">Management settings</span>
           <Item to="/site-report" icon="clock" tint="var(--line-2)" color="var(--ink-2)" label="Time on site" sub="Weekly hours per person, CSV export" />
+          <Item to="/treatment-types" icon="settings" tint="var(--line-2)" color="var(--ink-2)" label="Treatment schedule" sub="Vaccines, worming, flea & tick intervals" />
           <Item to="/staff" icon="people" tint="var(--line-2)" color="var(--ink-2)" label="Staff & permissions" sub="Approve new accounts, set roles" badge={pendingStaff} />
           <Item to="/kennels" icon="home2" tint="var(--line-2)" color="var(--ink-2)" label="Kennels & animals" sub="Kennel numbers, animals, meds, vaccines" />
           <Item to="/eod-settings" icon="settings" tint="var(--line-2)" color="var(--ink-2)" label="End-of-day checklist" sub="Edit the checks staff tick each evening" />

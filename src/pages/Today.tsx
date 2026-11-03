@@ -4,6 +4,7 @@ import { useAuth } from '../auth';
 import { SyncBadge } from '../App';
 import KennelLog from '../components/KennelLog';
 import { SiteStatus, TeamStatus, VisitorsOnSite } from '../components/SiteStatus';
+import CareDue from '../components/CareDue';
 import AnimalsOut from '../components/AnimalsOut';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
@@ -22,8 +23,6 @@ export default function Today() {
   const items = useTable('calendar_items');
   const outcomes = useTable('appointment_outcomes');
   const incidents = useTable('incidents');
-  const animals = useTable('animals');
-  const vaccines = useTable('vaccines_due');
   const leave = useTable('leave_requests');
   const sick = useTable('sick_reports');
   const visitors = useTable('visitors');
@@ -162,23 +161,7 @@ export default function Today() {
           })}
         </section>
 
-        {vaccines.length > 0 && (
-          <section className="card tight">
-            <div className="head" style={{ paddingBottom: 6 }}>
-              <h2 className="h">Vaccines due</h2>
-              <span className="t13">Next 14 days</span>
-            </div>
-            {vaccines.map((v) => (
-              <div key={v.id} className="row" style={{ alignItems: 'center' }}>
-                <div className="grow">
-                  <span className="t15">{animals.find((a) => a.id === v.animal_id)?.name ?? 'Animal'}</span>
-                  <span className="t13">{v.vaccine}</span>
-                </div>
-                <span className="chip" style={v.due_on <= d ? { background: 'var(--red-tint)', color: 'var(--red)' } : { color: 'var(--ink-2)' }}>{v.due_on === d ? 'Today' : shortDate(v.due_on)}</span>
-              </div>
-            ))}
-          </section>
-        )}
+        <CareDue />
 
         <KennelLog />
 
