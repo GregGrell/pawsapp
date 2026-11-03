@@ -276,3 +276,6 @@ create policy photos_records_write on storage.objects for insert to authenticate
 
 alter publication supabase_realtime add table public.animals, public.animal_locations, public.treatments,
   public.medical_notes, public.animal_files, public.medications, public.treatment_types;
+
+revoke execute on function public.can_edit_animals() from anon, public;
+grant execute on function public.can_edit_animals() to authenticated;
