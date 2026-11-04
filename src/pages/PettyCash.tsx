@@ -267,9 +267,9 @@ function SpendForm({ available }: { available: number }) {
       <div className="field">
         <span>Receipt · required</span>
         {!noReceipt && !receipt && (
-          <div className="grid2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <PhotoPicker value={receipt} onChange={setReceipt} label="Photo of receipt" required />
-            <button type="button" className="btn" style={{ minHeight: 56, background: '#fff', color: 'var(--amber)', border: '2px solid #B45309', fontWeight: 800, letterSpacing: '0.04em' }} onClick={() => setNoReceipt(true)}>NO RECEIPT</button>
+            <button type="button" className="btn" style={{ minHeight: 48, background: '#fff', color: 'var(--amber)', border: '2px solid #B45309', fontWeight: 800, letterSpacing: '0.04em' }} onClick={() => setNoReceipt(true)}>NO RECEIPT</button>
           </div>
         )}
         {receipt && <PhotoPicker value={receipt} onChange={setReceipt} required />}

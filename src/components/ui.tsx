@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signedUrl } from '../lib/store';
 
@@ -22,6 +22,8 @@ const P: Record<string, ReactNode> = {
   qr: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3h-3z" /><path d="M20 14v7h-3" /></>,
   wrench: <path d="M14.7 6.3a4 4 0 0 0 5 5L21 13l-8 8-3-3 8-8-1.3-1.3a4 4 0 0 1-5-5l2.6 2.6 2.1-.5.5-2.1z M3 21l6-6" />,
   trash: <><path d="M4 7h16" /><path d="M9 7V4h6v3" /><path d="M6 7l1 13h10l1-13" /></>,
+  image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.8" /><path d="m21 16-5-5-9 9" /></>,
+  file: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></>,
   download: <><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></>,
   home2: <><path d="M4 11 12 4l8 7" /><path d="M6 10v10h12V10" /></>,
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></>,
@@ -74,9 +76,14 @@ export function Pill({ on, onClick, children }: { on: boolean; onClick: () => vo
   );
 }
 
-/** Pick a photo (camera on phones). Shrinks it before storing so uploads stay small on mobile data. */
+/**
+ * Attach a photo or file: Camera, Gallery or Files.
+ * Photos are shrunk before storing so uploads stay small on mobile data.
+ */
 export function PhotoPicker({ value, onChange, label = 'Add photo', accept = 'image/*', required }: { value: Blob | null; onChange: (b: Blob | null) => void; label?: string; accept?: string; required?: boolean }) {
-  const ref = useRef<HTMLInputElement>(null);
+  const cam = useRef<HTMLInputElement>(null);
+  const gal = useRef<HTMLInputElement>(null);
+  const fil = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   useEffect(() => {
     if (!value) return setPreview(null);
@@ -84,33 +91,33 @@ export function PhotoPicker({ value, onChange, label = 'Add photo', accept = 'im
     setPreview(u);
     return () => URL.revokeObjectURL(u);
   }, [value]);
+  const pick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    onChange(f.type.startsWith('image/') ? await shrink(f) : f);
+  };
   if (value)
     return (
       <div className="attached">
         {value.type.startsWith('image/') && preview && <img src={preview} alt="" />}
-        <span className="t14" style={{ flex: 1, fontWeight: 600 }}>{value.type === 'application/pdf' ? 'PDF attached' : 'Photo attached'}</span>
+        <span className="t14" style={{ flex: 1, fontWeight: 600 }}>{value.type === 'application/pdf' ? 'PDF attached' : value.type.startsWith('image/') ? 'Photo attached' : 'File attached'}</span>
         <button type="button" className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => onChange(null)}>Remove</button>
       </div>
     );
+  const files = accept.includes('pdf') ? accept : `${accept},application/pdf`;
   return (
-    <>
-      <button type="button" className="photo" onClick={() => ref.current?.click()}>
-        <Icon name="camera" size={20} color="var(--blue)" /> {label}{required ? '' : ' · optional'}
-      </button>
-      <input
-        ref={ref}
-        type="file"
-        accept={accept}
-        capture={accept === 'image/*' ? 'environment' : undefined}
-        hidden
-        onChange={async (e) => {
-          const f = e.target.files?.[0];
-          e.target.value = '';
-          if (!f) return;
-          onChange(f.type.startsWith('image/') ? await shrink(f) : f);
-        }}
-      />
-    </>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span className="t13" style={{ fontWeight: 600 }}>{label}{required ? '' : ' · optional'}</span>
+      <div className="picker3" role="group" aria-label={label}>
+        <button type="button" className="photo" onClick={() => cam.current?.click()}><Icon name="camera" size={18} color="var(--blue)" /> Camera</button>
+        <button type="button" className="photo" onClick={() => gal.current?.click()}><Icon name="image" size={18} color="var(--blue)" /> Gallery</button>
+        <button type="button" className="photo" onClick={() => fil.current?.click()}><Icon name="file" size={18} color="var(--blue)" /> Files</button>
+      </div>
+      <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
+      <input ref={gal} type="file" accept="image/*" hidden onChange={pick} />
+      <input ref={fil} type="file" accept={files} hidden onChange={pick} />
+    </div>
   );
 }
 
@@ -167,4 +174,38 @@ export function Toaster() {
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
+}
+
+/** "Now" or an earlier time today, for entries made after the fact (e.g. signing a visitor out later). */
+export function NowOrTime({ label, onPick, after, disabled, small = true }: { label: string; onPick: (iso: string) => void; after?: string | null; disabled?: boolean; small?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [hm, setHm] = useState('');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const q = new Date(Date.now() + 3 * 3600_000);
+  const day = q.toISOString().slice(0, 10);
+  const nowHm = `${pad(q.getUTCHours())}:${pad(q.getUTCMinutes())}`;
+  const iso = hm ? new Date(`${day}T${hm}:00+03:00`).toISOString() : '';
+  const tooEarly = !!(iso && after && iso < after);
+  const future = !!(hm && hm > nowHm);
+  const minHm = after && new Date(Date.parse(after) + 3 * 3600_000).toISOString().slice(0, 10) === day ? new Date(Date.parse(after) + 3 * 3600_000).toISOString().slice(11, 16) : undefined;
+  const done = (v: string) => {
+    onPick(v);
+    setOpen(false);
+    setHm('');
+  };
+  if (!open)
+    return <button type="button" className={`btn ghost${small ? ' sm' : ''}`} style={{ flex: '0 0 auto' }} disabled={disabled} onClick={() => setOpen(true)}>{label}</button>;
+  return (
+    <div className="panel" style={{ flexBasis: '100%', width: '100%' }}>
+      <div className="btns" style={{ alignItems: 'center' }}>
+        <button type="button" className="btn sm" onClick={() => done(new Date().toISOString())}>{label} now</button>
+        <span className="t13">or at</span>
+        <input className="input" type="time" aria-label={`${label} time`} value={hm} min={minHm} max={nowHm} onChange={(e) => setHm(e.target.value)} style={{ width: 120 }} />
+        <button type="button" className="btn ghost sm" disabled={!hm || tooEarly || future} onClick={() => done(iso)}>Save</button>
+        <button type="button" className="btn link sm" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+      {tooEarly && <span className="bad">That's before they signed in.</span>}
+      {future && <span className="bad">That time hasn't happened yet.</span>}
+    </div>
+  );
 }

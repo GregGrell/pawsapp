@@ -166,3 +166,6 @@ h1, h2, h3, p { margin: 0; }
 /* Wider layout for animal records on laptops (overseas adoption team) */
 .app.wide { max-width: 980px; }
 .app.wide ~ .nav, .app.wide .nav { max-width: 980px; }
+
+.picker3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.picker3 .photo { min-height: 52px; font-size: 13px; gap: 6px; padding: 0 4px; }
