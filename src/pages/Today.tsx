@@ -4,7 +4,7 @@ import { useAuth } from '../auth';
 import { SyncBadge } from '../App';
 import KennelLog from '../components/KennelLog';
 import { SiteStatus, TeamStatus, VisitorsOnSite } from '../components/SiteStatus';
-import CareDue from '../components/CareDue';
+import CareDue, { BirthdaysToday } from '../components/CareDue';
 import AnimalsOut from '../components/AnimalsOut';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
@@ -161,6 +161,7 @@ export default function Today() {
           })}
         </section>
 
+        <BirthdaysToday />
         <CareDue />
 
         <KennelLog />

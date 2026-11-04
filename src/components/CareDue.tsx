@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
-import { careDue, type Due } from '../lib/animals';
+import { birthdaysOn, careDue, type Due } from '../lib/animals';
 import { useTable } from '../lib/hooks';
 import { insert } from '../lib/store';
 import { addDays, shortDate, today } from '../lib/time';
@@ -50,5 +50,25 @@ function DueRow({ d }: { d: Due }) {
       </Link>
       <button className="btn sm" style={{ flex: '0 0 auto' }} onClick={done}>Done</button>
     </div>
+  );
+}
+
+/** Today: animals celebrating a birthday (for social media posts). */
+export function BirthdaysToday() {
+  const animals = useTable('animals');
+  const list = birthdaysOn(animals, today());
+  if (!list.length) return null;
+  return (
+    <section className="card tight" style={{ borderColor: '#F9C6E0', background: '#FFF5FA' }} aria-label="Birthdays today">
+      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 Birthday{list.length > 1 ? 's' : ''} today</h2>
+      {list.map(({ a, turns }) => (
+        <Link key={a.id} to={`/records/${a.id}`} className="row" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="grow">
+            <span className="t15">{a.name} turns {turns}{a.dob_estimated ? ' (estimated)' : ''}</span>
+            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''} · tap for photos</span>
+          </div>
+        </Link>
+      ))}
+    </section>
   );
 }

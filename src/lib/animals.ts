@@ -123,3 +123,19 @@ export const CHIP_RESULT: Record<string, { label: string; bad: boolean }> = {
   mismatch: { label: 'Number different', bad: true },
 };
 export const CONTACT_KIND: Record<string, string> = { adopter: 'Adopter', foster: 'Foster carer', other: 'Other' };
+
+/** Animals in our care whose birthday falls on a day (29 Feb birthdays show on 28 Feb in other years). */
+export function birthdaysOn(animals: Row[], day: string) {
+  const md = day.slice(5);
+  const y = Number(day.slice(0, 4));
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  return animals
+    .filter((a) => a.dob && (STATUS[a.status]?.inCare ?? a.in_shelter))
+    .filter((a) => {
+      const b = a.dob.slice(5);
+      return b === md || (!leap && b === '02-29' && md === '02-28');
+    })
+    .filter((a) => a.dob < day)
+    .map((a) => ({ a, turns: y - Number(a.dob.slice(0, 4)) }))
+    .sort((p, q) => p.a.name.localeCompare(q.a.name));
+}

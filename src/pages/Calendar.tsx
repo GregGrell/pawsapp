@@ -5,6 +5,8 @@ import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
 import { Empty, Icon, Page, StoredImage, toast } from '../components/ui';
 import { CATEGORIES, catStyle, hm, itemsOn, useProfiles, useTable } from '../lib/hooks';
 import { insert, update, type Row } from '../lib/store';
+import { Link } from 'react-router-dom';
+import { birthdaysOn } from '../lib/animals';
 import { addDays, dayLabel, longDate, minusMinutes, monthLabel, nowHM, today, weekday } from '../lib/time';
 
 export default function Calendar() {
@@ -13,6 +15,7 @@ export default function Calendar() {
   const items = useTable('calendar_items');
   const outcomes = useTable('appointment_outcomes');
   const comps = useTable('task_completions');
+  const animals = useTable('animals');
   const [params, setParams] = useSearchParams();
   const d = today();
   const [day, setDay] = useState(d);
@@ -91,11 +94,12 @@ export default function Calendar() {
           {week.map((x) => {
             const { dow, num } = dayLabel(x);
             const count = itemsOn(items, x).length;
+            const bdays = birthdaysOn(animals, x).length;
             return (
-              <button key={x} className={`${x === day ? 'on' : ''} ${x === d ? 'today' : ''}`} onClick={() => setDay(x)} aria-label={`${longDate(x)}, ${count} entries`}>
+              <button key={x} className={`${x === day ? 'on' : ''} ${x === d ? 'today' : ''}`} onClick={() => setDay(x)} aria-label={`${longDate(x)}, ${count} entries${bdays ? `, ${bdays} birthday${bdays > 1 ? 's' : ''}` : ''}`}>
                 <span>{dow}</span>
                 <b>{num}</b>
-                <span style={{ fontSize: 10 }}>{count ? '•'.repeat(Math.min(count, 3)) : ' '}</span>
+                <span style={{ fontSize: 10 }}>{bdays ? '🎂' : ''}{count ? '•'.repeat(Math.min(count, 3)) : bdays ? '' : ' '}</span>
               </button>
             );
           })}
@@ -104,6 +108,8 @@ export default function Calendar() {
       </div>
 
       {formOpen && <AddForm day={day} people={people.filter((p) => p.active)} initialKind={params.get('add') === 'task' ? 'task' : 'appointment'} meId={me.id} onSaved={(date) => { setDay(date); setParams({}); }} />}
+
+      <Birthdays day={day} animals={animals} />
 
       {anytime.length > 0 && (
         <section className="card tight">
@@ -183,3 +189,22 @@ function AddForm({ day, people, initialKind, meId, onSaved }: { day: string; peo
       </section>
     );
   }
+
+function Birthdays({ day, animals }: { day: string; animals: Row[] }) {
+  const list = birthdaysOn(animals, day);
+  if (!list.length) return null;
+  return (
+    <section className="card tight" style={{ borderColor: '#F9C6E0', background: '#FFF5FA' }}>
+      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 Birthdays · {longDate(day)}</h2>
+      {list.map(({ a, turns }) => (
+        <Link key={a.id} to={`/records/${a.id}`} className="row" style={{ textDecoration: 'none', color: 'inherit', alignItems: 'center' }}>
+          <span className="chip" style={{ background: '#FCE7F3', color: '#9D174D' }}>Birthday</span>
+          <div className="grow">
+            <span className="t15">{a.name} turns {turns}{a.dob_estimated ? ' (estimated)' : ''}</span>
+            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''}{a.status !== 'shelter' ? ` · ${a.status === 'foster' ? 'at foster' : 'on trial'}` : ''}</span>
+          </div>
+        </Link>
+      ))}
+    </section>
+  );
+}
