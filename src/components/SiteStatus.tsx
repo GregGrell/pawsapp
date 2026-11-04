@@ -21,10 +21,11 @@ export function SiteStatus() {
   const [other, setOther] = useState('');
   const [leftAt, setLeftAt] = useState('17:00');
 
-  const arrive = () => {
-    insert('site_presence', { user_id: me.id, event: 'in', at: new Date().toISOString(), reason: '', added_by: me.id, created_at: new Date().toISOString() });
-    toast('Signed in on site');
+  const arrive = (remote = false) => {
+    insert('site_presence', { user_id: me.id, event: 'in', remote, at: new Date().toISOString(), reason: '', added_by: me.id, created_at: new Date().toISOString() });
+    toast(remote ? 'Signed in · working from home' : 'Signed in on site');
   };
+  const canRemote = !!me.can_work_remote;
 
   // Still signed in from an earlier day
   if (last?.event === 'in' && today(new Date(last.at)) < d) {
@@ -60,11 +61,42 @@ export function SiteStatus() {
           </div>
           <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, background: '#9AA5A0' }} />
         </div>
-        <button className="btn full" style={{ minHeight: 56, fontSize: 17 }} onClick={arrive}>
+        <button className="btn full" style={{ minHeight: 56, fontSize: 17 }} onClick={() => arrive(false)}>
           <Icon name="home" size={20} color="#fff" width={2.2} /> {last && today(new Date(last.at)) === d ? "I'm back on site" : 'Arrive on site'}
         </button>
+        {canRemote && (
+          <button className="btn ghost full" style={{ minHeight: 52 }} onClick={() => arrive(true)}>
+            <Icon name="home2" size={20} color="var(--blue)" width={2} /> Start working from home
+          </button>
+        )}
       </section>
     );
+
+  // Working from home
+  if (last?.remote) {
+    const out = (reason_kind: string, reason = '') =>
+      insert('site_presence', { user_id: me.id, event: 'out', at: new Date().toISOString(), reason_kind, reason, added_by: me.id, created_at: new Date().toISOString() });
+    return (
+      <section className="card" style={{ borderColor: 'var(--blue-line)', background: 'var(--blue-wash)' }}>
+        <div className="head">
+          <div className="grow">
+            <span className="h" style={{ color: 'var(--blue-dark)' }}>Working from home</span>
+            <span className="t15">Since {timeOf(last.at)}</span>
+          </div>
+          <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, background: 'var(--blue)' }} />
+        </div>
+        <div className="grid2">
+          <button className="btn ghost" onClick={() => { out('end_of_day'); toast('Signed out · hours recorded'); }}>Finished for the day</button>
+          <button className="btn ghost" onClick={() => { out('break'); toast('On a break'); }}>Taking a break</button>
+        </div>
+        <button className="btn outline full" onClick={() => {
+          out('other', 'Moved to the shelter');
+          insert('site_presence', { user_id: me.id, event: 'in', remote: false, at: new Date(Date.now() + 1000).toISOString(), reason: '', added_by: me.id, created_at: new Date().toISOString() });
+          toast('Signed in on site');
+        }}>I'm now at the shelter</button>
+      </section>
+    );
+  }
 
   // On site: offer leave with reasons; appointments due within the hour come first
   const now = toMin(nowHM());
@@ -140,14 +172,15 @@ export function TeamStatus() {
   const todays = events.filter((e) => today(new Date(e.at)) === d);
   const people = list.filter((p) => p.active && (p.role === 'staff' || todays.some((e) => e.user_id === p.id)));
 
-  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none'; text: string; vol?: boolean; visitor?: boolean; vid?: string; vin?: string };
+  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none' | 'remote'; text: string; vol?: boolean; visitor?: boolean; vid?: string; vin?: string };
   const rows: R[] = people.map((p) => {
     const last = latestFor(todays, p.id);
     const isSick = sick.some((s) => s.user_id === p.id && s.sick_on === d);
     const onLeave = leave.some((l) => l.user_id === p.id && l.status === 'approved' && l.start_on <= d && l.end_on >= d);
     let state: R['state'] = 'none';
     let text = 'Not in yet today';
-    if (last?.event === 'in') { state = 'on'; text = `On site since ${timeOf(last.at)}`; }
+    if (last?.event === 'in' && last.remote) { state = 'remote'; text = `Working from home since ${timeOf(last.at)}`; }
+    else if (last?.event === 'in') { state = 'on'; text = `On site since ${timeOf(last.at)}`; }
     else if (last?.event === 'out') { state = 'off'; text = p.role === 'volunteer' ? `Left ${timeOf(last.at)}` : `${reasonText(last)} · left ${timeOf(last.at)}`; }
     else if (isSick) { state = 'off'; text = 'Off sick'; }
     else if (onLeave) { state = 'off'; text = 'On leave'; }
@@ -161,12 +194,12 @@ export function TeamStatus() {
     });
   }
   if (!rows.length) return null;
-  const order = { on: 0, off: 1, none: 2 };
+  const order = { on: 0, remote: 1, off: 2, none: 3 };
   rows.sort((a, b) => order[a.state] - order[b.state] || Number(!!a.visitor) - Number(!!b.visitor));
 
   const onCount = rows.filter((r) => r.state === 'on').reduce((n, r) => n + 1 + (r.visitor ? Number(r.label.match(/\+ (\d+)$/)?.[1] ?? 0) : 0), 0);
-  const dot = (r: R) => (r.state === 'on' ? (r.vol || r.visitor ? '#86D7A2' : '#16A34A') : r.state === 'off' ? 'var(--amber)' : '#C9D2CE');
-  const badgeBg = (r: R) => (r.state === 'on' ? (r.vol || r.visitor ? '#F0FAF3' : '#E6F4EA') : r.state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)');
+  const dot = (r: R) => (r.state === 'remote' ? 'var(--blue)' : r.state === 'on' ? (r.vol || r.visitor ? '#86D7A2' : '#16A34A') : r.state === 'off' ? 'var(--amber)' : '#C9D2CE');
+  const badgeBg = (r: R) => (r.state === 'remote' ? 'var(--blue-wash)' : r.state === 'on' ? (r.vol || r.visitor ? '#F0FAF3' : '#E6F4EA') : r.state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)');
   return (
     <section className="card tight" aria-label="On site today">
       <div className="head" style={{ paddingBottom: 6 }}>
@@ -179,12 +212,12 @@ export function TeamStatus() {
           <div className="grow">
             <span className="t15">{r.label}{r.sub && <span className="t13" style={{ fontWeight: 500 }}> · {r.sub}</span>}</span>
             <span className="t13" style={r.state === 'off' && !r.visitor ? { color: 'var(--amber)', fontWeight: 600 } : undefined}>
-              <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'off' ? 'Off site. ' : ''}</span>{r.text}
+              <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'remote' ? 'Working from home. ' : r.state === 'off' ? 'Off site. ' : ''}</span>{r.text}
             </span>
           </div>
           {r.vid && <NowOrTime label="Sign out" after={r.vin} onPick={(at) => signOutVisitor(r.vid!, r.label, at)} />}
-          {!r.vid && <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
-            {r.state === 'on' ? 'ON' : 'OFF'}
+          {!r.vid && <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'remote' ? 'var(--blue-dark)' : r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
+            {r.state === 'remote' ? 'HOME' : r.state === 'on' ? 'ON' : 'OFF'}
           </span>}
         </div>
       ))}

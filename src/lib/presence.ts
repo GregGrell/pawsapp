@@ -25,31 +25,33 @@ export function reasonText(e?: Row) {
   return REASON_LABEL[e.reason_kind] + (e.reason ? ` — ${e.reason}` : '');
 }
 
-export type Session = { start: number; end: number; open: boolean; missingOut: boolean };
+export type Session = { start: number; end: number; open: boolean; missingOut: boolean; remote: boolean };
 
 /** Build on-site sessions for one person from their in/out events. */
 export function sessions(events: Row[], userId: string, now = Date.now()): Session[] {
   const list = events.filter((e) => e.user_id === userId).sort((a, b) => a.at.localeCompare(b.at));
   const out: Session[] = [];
   let start: number | null = null;
+  let remote = false;
   for (const e of list) {
     const t = Date.parse(e.at);
     if (e.event === 'in') {
       if (start !== null) {
         // Two "in"s in a row: close the earlier one at the end of its own day (22:00) and flag it.
         const d = today(new Date(start));
-        out.push({ start, end: Math.min(t, dayStart(d) + 22 * 3600_000), open: false, missingOut: true });
+        out.push({ start, end: Math.min(t, dayStart(d) + 22 * 3600_000), open: false, missingOut: true, remote });
       }
       start = t;
+      remote = !!e.remote;
     } else if (start !== null) {
-      out.push({ start, end: t, open: false, missingOut: false });
+      out.push({ start, end: t, open: false, missingOut: false, remote });
       start = null;
     }
   }
   if (start !== null) {
     const d = today(new Date(start));
-    if (d === today(new Date(now))) out.push({ start, end: now, open: true, missingOut: false });
-    else out.push({ start, end: dayStart(d) + 22 * 3600_000, open: false, missingOut: true });
+    if (d === today(new Date(now))) out.push({ start, end: now, open: true, missingOut: false, remote });
+    else out.push({ start, end: dayStart(d) + 22 * 3600_000, open: false, missingOut: true, remote });
   }
   return out;
 }

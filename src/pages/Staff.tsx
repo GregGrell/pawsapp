@@ -40,7 +40,7 @@ export default function Staff() {
       <section className="card tight">
         <h2 className="h" style={{ paddingBottom: 6 }}>Team</h2>
         {active.map((p) => (
-          <div key={p.id} className="row" style={{ alignItems: 'center' }}>
+          <div key={p.id} className="row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
             <div className="grow"><span className="t15">{p.full_name}{p.id === me.id ? ' (you)' : ''}</span><span className="t13">{p.email}</span></div>
             <select className="input" style={{ width: 150 }} value={p.role} disabled={p.id === me.id} aria-label={`${p.full_name}'s role`}
               onChange={(e) => { update('profiles', { id: p.id }, { role: e.target.value }); toast('Role updated'); }}>
@@ -49,13 +49,19 @@ export default function Staff() {
               <option value="staff">Staff</option>
               <option value="management">Management</option>
             </select>
+            {(p.role === 'staff' || p.role === 'management') && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }} title="Can sign in as working from home">
+                <input type="checkbox" checked={!!p.can_work_remote} onChange={(e) => { update('profiles', { id: p.id }, { can_work_remote: e.target.checked }); toast(e.target.checked ? `${p.full_name} can now sign in from home` : 'Working from home turned off'); }} style={{ width: 18, height: 18 }} />
+                From home
+              </label>
+            )}
             {p.id !== me.id && (
               <button className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => confirm(`Remove ${p.full_name}'s access? Their records stay.`) && update('profiles', { id: p.id }, { active: false })}>Remove</button>
             )}
           </div>
         ))}
       </section>
-      <p className="note">Records only is for the overseas adoption team: they see and update animal records, nothing else. Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
+      <p className="note">Tick <b>From home</b> to let someone sign in as working from home; their hours are recorded separately from time on site. Records only is for the overseas adoption team: they see and update animal records, nothing else. Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
     </Page>
   );
 }

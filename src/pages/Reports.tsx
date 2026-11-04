@@ -358,7 +358,9 @@ export function compute(t: Data, from: string, to: string, name: (id?: string | 
   // Staff
   const staff = people.filter((p) => p.role === 'staff' || p.role === 'management' || t.presence.some((e) => e.user_id === p.id));
   const staffRows = staff.map((p) => {
-    const ms = Object.entries(msByDay(sessions(t.presence, p.id))).filter(([day]) => day >= from && day <= to).reduce((n, [, v]) => n + v, 0);
+    const ss = sessions(t.presence, p.id);
+    const ms = Object.entries(msByDay(ss)).filter(([day]) => day >= from && day <= to).reduce((n, [, v]) => n + v, 0);
+    const home = Object.entries(msByDay(ss.filter((x) => x.remote))).filter(([day]) => day >= from && day <= to).reduce((n, [, v]) => n + v, 0);
     const daysOn = Object.entries(msByDay(sessions(t.presence, p.id))).filter(([day, v]) => day >= from && day <= to && v > 0).length;
     const til = t.ooh.filter((o) => o.user_id === p.id && o.status === 'counted').reduce((n, o) => n + o.til_minutes, 0);
     const sickDays = t.sick.filter((s) => s.user_id === p.id).length;
@@ -367,18 +369,19 @@ export function compute(t: Data, from: string, to: string, name: (id?: string | 
       const b = l.end_on < to ? l.end_on : to;
       return n + Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 86400_000) + 1);
     }, 0);
-    return { p, ms, daysOn, til, sickDays, leaveDays };
+    return { p, ms, home, daysOn, til, sickDays, leaveDays };
   }).filter((x) => x.ms || x.til || x.sickDays || x.leaveDays);
   sections.push({
     title: 'Staff', file: 'staff',
     stats: [
-      { label: 'Hours on site (all)', value: hhmm(staffRows.reduce((n, x) => n + x.ms, 0)) },
+      { label: 'Hours worked (all)', value: hhmm(staffRows.reduce((n, x) => n + x.ms, 0)) },
+      { label: 'of which from home', value: hhmm(staffRows.reduce((n, x) => n + x.home, 0)) },
       { label: 'TIL earned', value: hhmm(staffRows.reduce((n, x) => n + x.til, 0) * 60000) },
       { label: 'Sick days', value: staffRows.reduce((n, x) => n + x.sickDays, 0) },
       { label: 'Leave days', value: staffRows.reduce((n, x) => n + x.leaveDays, 0) },
     ],
-    breakdown: { head: ['Person', 'Days on site', 'Hours on site', 'TIL earned', 'Sick days', 'Leave days'], rows: staffRows.map((x) => [x.p.full_name, x.daysOn, hhmm(x.ms), hhmm(x.til * 60000), x.sickDays, x.leaveDays]) },
-    detail: { head: ['Person', 'Days on site', 'Hours on site', 'TIL earned (mins)', 'Sick days', 'Leave days'], rows: staffRows.map((x) => [x.p.full_name, x.daysOn, (x.ms / 3600000).toFixed(2), x.til, x.sickDays, x.leaveDays]) },
+    breakdown: { head: ['Person', 'Days worked', 'Hours on site', 'Hours from home', 'TIL earned', 'Sick days', 'Leave days'], rows: staffRows.map((x) => [x.p.full_name, x.daysOn, hhmm(x.ms - x.home), hhmm(x.home), hhmm(x.til * 60000), x.sickDays, x.leaveDays]) },
+    detail: { head: ['Person', 'Days worked', 'Hours on site', 'Hours from home', 'TIL earned (mins)', 'Sick days', 'Leave days'], rows: staffRows.map((x) => [x.p.full_name, x.daysOn, ((x.ms - x.home) / 3600000).toFixed(2), (x.home / 3600000).toFixed(2), x.til, x.sickDays, x.leaveDays]) },
   });
 
   // Month by month (for periods longer than a month)
