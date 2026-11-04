@@ -107,9 +107,9 @@ async function runSchedule() {
   for (const it of todays.filter((x) => x.at_time)) {
     const t = toMin(it.at_time.slice(0, 5));
     if (now >= t - 60 && now < t && (await once(`rem:${it.id}:${day}`))) {
-      const who = it.assignee ? [it.assignee] : 'all';
-      const label = it.kind === 'task' ? 'Task' : ({ visitor: 'Visitor', vet: 'Vet', airport: 'Airport run', dropoff: 'Drop-off / pick-up' } as any)[it.category] ?? 'Appointment';
-      await sendTo(who, { title: `${it.at_time.slice(0, 5)} · ${label}`, body: it.title, url: '#/calendar', tag: `rem-${it.id}` });
+      const who = it.attendees?.length ? it.attendees : it.assignee ? [it.assignee] : 'all';
+      const label = it.kind === 'task' ? 'Task' : ({ visitor: 'Visitor', vet: 'Vet', airport: 'Airport run', dropoff: 'Drop-off / pick-up', meeting: 'Meeting' } as any)[it.category] ?? 'Appointment';
+      await sendTo(who, { title: `${it.at_time.slice(0, 5)} · ${label}`, body: it.external_people ? `${it.title} · with ${it.external_people}` : it.title, url: '#/calendar', tag: `rem-${it.id}` });
       log.push(`reminder ${it.title}`);
     }
   }

@@ -25,13 +25,14 @@ export const CATEGORIES: { key: string; label: string; bg: string; fg: string }[
   { key: 'vet', label: 'Vet', bg: 'var(--vet-bg)', fg: 'var(--vet-fg)' },
   { key: 'airport', label: 'Airport run', bg: 'var(--airport-bg)', fg: 'var(--airport-fg)' },
   { key: 'dropoff', label: 'Drop-off / pick-up', bg: 'var(--dropoff-bg)', fg: 'var(--dropoff-fg)' },
+  { key: 'meeting', label: 'Meeting', bg: '#EDE9FE', fg: '#5B21B6' },
   { key: 'other', label: 'Other', bg: 'var(--other-bg)', fg: 'var(--other-fg)' },
 ];
 export const TASK_STYLE = { label: 'Task', bg: 'var(--task-bg)', fg: 'var(--task-fg)' };
 
 export function catStyle(item: Row) {
   if (item.kind === 'task') return TASK_STYLE;
-  return CATEGORIES.find((c) => c.key === item.category) ?? CATEGORIES[4];
+  return CATEGORIES.find((c) => c.key === item.category) ?? CATEGORIES[CATEGORIES.length - 1];
 }
 
 /** Calendar entries that happen on a given day (one-off, daily, weekly). */

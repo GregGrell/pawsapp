@@ -47,7 +47,7 @@ export default function TaskList({ day = today(), limit }: { day?: string; limit
                 <span className="t13">
                   {REPEAT[t.repeat]}
                   {t.at_time ? ` · ${t.at_time.slice(0, 5)}` : ''}
-                  {t.assignee ? ` · for ${name(t.assignee)}` : ''}
+                  {(t.attendees?.length ? t.attendees : t.assignee ? [t.assignee] : []).length ? ` · for ${(t.attendees?.length ? t.attendees : [t.assignee]).map((id: string) => name(id)).join(', ')}` : ''}
                 </span>
                 {done && <span className="ok">Done by {name(c!.done_by)} · {timeOf(c!.done_at)}{c!.photo_path ? ' · photo' : ''}</span>}
                 {claimed && !mine && <span className="warn">{name(c!.claimed_by)} has this</span>}

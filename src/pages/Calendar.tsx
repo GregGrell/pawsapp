@@ -50,8 +50,9 @@ export default function Calendar() {
           <span className="t13">
             {it.repeat !== 'none' ? `${it.repeat === 'daily' ? 'Daily' : 'Weekly'} · ` : ''}
             Added by {name(it.created_by)}
-            {it.assignee ? ` · ${name(it.assignee)}` : ''}
+            {(it.attendees?.length ? it.attendees : it.assignee ? [it.assignee] : []).length ? ` · ${(it.attendees?.length ? it.attendees : [it.assignee]).map((id: string) => name(id)).join(', ')}` : ''}
           </span>
+          {it.external_people && <span className="t14">With: {it.external_people}</span>}
           {it.notes && <span className="t14">{it.notes}</span>}
           {comp && <span className="ok">Done by {name(comp.done_by)}</span>}
           {due && closing !== it.id && (
@@ -134,12 +135,14 @@ function AddForm({ day, people, initialKind, meId, onSaved }: { day: string; peo
     const [title, setTitle] = useState('');
     const [date, setDate] = useState(day);
     const [time, setTime] = useState('');
-    const [assignee, setAssignee] = useState('');
+    const [who, setWho] = useState<string[]>([]);
+    const [external, setExternal] = useState('');
+    const toggle = (id: string) => setWho((w) => (w.includes(id) ? w.filter((x) => x !== id) : [...w, id]));
     const [notes, setNotes] = useState('');
     const save = () => {
       insert('calendar_items', {
         kind, category: kind === 'task' ? 'task' : category, title: title.trim(), starts_on: date, at_time: time || null,
-        repeat, assignee: assignee || null, notes: notes.trim(), created_by: meId, created_at: new Date().toISOString(), active: true,
+        repeat, assignee: who[0] ?? null, attendees: who, external_people: kind === 'appointment' ? external.trim() : '', notes: notes.trim(), created_by: meId, created_at: new Date().toISOString(), active: true,
       });
       toast('Added to the calendar');
       onSaved(date);
@@ -176,14 +179,18 @@ function AddForm({ day, people, initialKind, meId, onSaved }: { day: string; peo
           <label className="field"><span>{repeat === 'none' ? 'Date' : 'Starting'}</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className="field"><span>Time · optional</span><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></label>
         </div>
-        <span className="note">{time ? `Everyone gets a reminder at ${minusMinutes(time, 60)}, 1 hour before.` : 'No time set — the reminder comes first thing in the morning.'}</span>
-        <label className="field">
-          <span>Who's on it?</span>
-          <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
-            <option value="">Anyone</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-          </select>
-        </label>
+        <span className="note">{time ? `A reminder goes out at ${minusMinutes(time, 60)}, 1 hour before.` : 'No time set — the reminder comes first thing in the morning.'}</span>
+        <div className="field">
+          <span>{kind === 'appointment' && category === 'meeting' ? "Who's attending?" : "Who's on it?"} · tap everyone who applies</span>
+          <div className="pills">
+            <button type="button" className="pill" aria-pressed={who.length === 0} onClick={() => setWho([])}>Anyone</button>
+            {people.filter((p) => p.role !== 'records').map((p) => <button key={p.id} type="button" className="pill" aria-pressed={who.includes(p.id)} onClick={() => toggle(p.id)}>{p.full_name.split(' ')[0]}{people.filter((q) => q.full_name.split(' ')[0] === p.full_name.split(' ')[0]).length > 1 ? ` ${p.full_name.split(' ')[1]?.[0] ?? ''}` : ''}</button>)}
+          </div>
+          {who.length > 0 && <span className="t13">Reminders go to {who.length === 1 ? 'this person' : `these ${who.length} people`} only.</span>}
+        </div>
+        {kind === 'appointment' && (
+          <label className="field"><span>External people · optional</span><input value={external} onChange={(e) => setExternal(e.target.value)} placeholder="e.g. Dr Ahmed (vet), Sarah from QFF" /></label>
+        )}
         <label className="field"><span>Notes · optional</span><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Clinic address, what to bring" /></label>
         <button className="btn" disabled={!title.trim() || !date} onClick={save}>{title.trim() ? 'Add to calendar' : 'Add a description to save'}</button>
       </section>
