@@ -6,7 +6,11 @@ import { supabase } from './supabase';
 export type Rec = Record<string, any>;
 export type Parsed = { report: string; file: string; rows: Rec[] };
 
+// Checked in order; each report is recognised by a column only it has.
 const REPORTS: [string, string][] = [
+  ['diagnoses', 'Date Diagnosed'],
+  ['exams', 'Exam Reason'],
+  ['procedures', 'Procedure/Surgery Type'],
   ['animals', 'Days In Custody'],
   ['people', 'Primary Email'],
   ['intakes', 'Intake Type'],
@@ -16,9 +20,6 @@ const REPORTS: [string, string][] = [
   ['vaccines', 'Vaccine Product'],
   ['tests', 'Test Name'],
   ['treatments', 'Dose Notes'],
-  ['procedures', 'Procedure/Surgery Type'],
-  ['exams', 'Exam Reason'],
-  ['diagnoses', 'Diagnosis'],
 ];
 
 export async function readFiles(files: File[]): Promise<Parsed[]> {
