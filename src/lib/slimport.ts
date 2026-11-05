@@ -155,7 +155,7 @@ export function build(parsed: Parsed[], types: TypeRow[]) {
     keep('animals', key, a, 'animals', key);
     const kg = parseFloat(s(a['Current Weight']));
     const on = d(a['Date Weighed']);
-    if (kg > 0 && on) {
+    if (kg > 0 && kg < 150 && on) { // anything heavier is a typo in Shelterluv; the original stays in sl_raw
       const lbs = /lb/i.test(s(a['Current Weight']));
       weights.push({ sl_key: `W:${key}:${on}`, animal: key, weighed_on: on, kg: Math.round((lbs ? kg * 0.4536 : kg) * 100) / 100, notes: 'From Shelterluv' });
     }
