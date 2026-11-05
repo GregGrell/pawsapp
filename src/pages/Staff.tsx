@@ -51,7 +51,7 @@ export default function Staff() {
             </select>
             {(p.role === 'staff' || p.role === 'management') && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }} title="Can sign in as working from home">
-                <input type="checkbox" checked={!!p.can_work_remote} onChange={(e) => { update('profiles', { id: p.id }, { can_work_remote: e.target.checked }); toast(e.target.checked ? `${p.full_name} can now sign in from home` : 'Working from home turned off'); }} style={{ width: 18, height: 18 }} />
+                <input type="checkbox" checked={p.role === 'management' || !!p.can_work_remote} disabled={p.role === 'management'} onChange={(e) => { update('profiles', { id: p.id }, { can_work_remote: e.target.checked }); toast(e.target.checked ? `${p.full_name} can now sign in from home` : 'Working from home turned off'); }} style={{ width: 18, height: 18 }} />
                 From home
               </label>
             )}
@@ -61,7 +61,7 @@ export default function Staff() {
           </div>
         ))}
       </section>
-      <p className="note">Tick <b>From home</b> to let someone sign in as working from home; their hours are recorded separately from time on site. Records only is for the overseas adoption team: they see and update animal records, nothing else. Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
+      <p className="note">Management can always sign in as working from home. Tick <b>From home</b> to give staff the same option; their hours are recorded separately from time on site. Records only is for the overseas adoption team: they see and update animal records, nothing else. Volunteers can only sign in and out of site, sign animals out, and report incidents and maintenance. Staff can log, tick tasks, add to the calendar and book leave. Management can also post requests, approve leave, see sick certificates, issue petty cash, export, and change these settings.</p>
     </Page>
   );
 }

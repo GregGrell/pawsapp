@@ -25,7 +25,7 @@ export function SiteStatus() {
     insert('site_presence', { user_id: me.id, event: 'in', remote, at: new Date().toISOString(), reason: '', added_by: me.id, created_at: new Date().toISOString() });
     toast(remote ? 'Signed in · working from home' : 'Signed in on site');
   };
-  const canRemote = !!me.can_work_remote;
+  const canRemote = me.role === 'management' || !!me.can_work_remote;
 
   // Still signed in from an earlier day
   if (last?.event === 'in' && today(new Date(last.at)) < d) {
