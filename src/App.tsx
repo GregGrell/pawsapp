@@ -30,6 +30,7 @@ import RecordsMore from './pages/RecordsMore';
 import { FlightListEdit, FlightLists } from './pages/FlightList';
 import { ContactEdit, Contacts } from './pages/Contacts';
 import Reports from './pages/Reports';
+import SlImport from './pages/SlImport';
 
 export default function App() {
   return (
@@ -115,6 +116,7 @@ function Shell() {
         <Route path="/contacts" element={<Contacts />} />
         <Route path="/contacts/:id" element={<ContactEdit />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/sl-import" element={<SlImport />} />
         <Route path="*" element={<Today />} />
       </Routes>
       <Nav path={loc.pathname} tabs={TABS} morePaths={MORE_PATHS} />
@@ -137,7 +139,7 @@ const REC_TABS = [
   { to: '/contacts', icon: 'people', label: 'People' },
   { to: '/more', icon: 'more', label: 'More' },
 ];
-const MORE_PATHS = ['/reports', '/records', '/flight-lists', '/contacts', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
+const MORE_PATHS = ['/reports', '/sl-import', '/records', '/flight-lists', '/contacts', '/treatment-types', '/more', '/leave', '/sick', '/kennels', '/staff', '/eod-settings', '/incidents', '/visitors', '/notifications', '/maintenance', '/site-report', '/animal-out'];
 const VOL_TABS = [
   { to: '/', icon: 'home', label: 'Today' },
   { to: '/animal-out', icon: 'suitcase', label: 'Animals' },

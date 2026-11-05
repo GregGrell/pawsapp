@@ -48,6 +48,7 @@ export default function More() {
           <span className="sect h">Management settings</span>
           <Item to="/reports" icon="tasks" tint="#FCE7F3" color="#9D174D" label="Reports" sub="Month, year or any dates: adoptions, care, money, staff" />
           <Item to="/site-report" icon="clock" tint="var(--line-2)" color="var(--ink-2)" label="Time on site" sub="Weekly hours per person, CSV export" />
+          <Item to="/sl-import" icon="download" tint="var(--line-2)" color="var(--ink-2)" label="Import from Shelterluv" sub="Load Shelterluv Excel exports" />
           <Item to="/treatment-types" icon="settings" tint="var(--line-2)" color="var(--ink-2)" label="Treatment schedule" sub="Vaccines, worming, flea & tick intervals" />
           <Item to="/staff" icon="people" tint="var(--line-2)" color="var(--ink-2)" label="Staff & permissions" sub="Approve new accounts, set roles" badge={pendingStaff} />
           <Item to="/kennels" icon="home2" tint="var(--line-2)" color="var(--ink-2)" label="Kennels & animals" sub="Kennel numbers, animals, meds, vaccines" />

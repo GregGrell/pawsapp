@@ -1,0 +1,4 @@
+-- Shelterluv import support (applied via Supabase as "shelterluv_import", 2026-11-05):
+-- sl_key unique columns on animals, contacts, animal_locations, treatments, medical_notes, medications, animal_weights;
+-- animals.sl_internal_id; sl_raw table (every exported row verbatim); *_in_care views so phones only load
+-- care records for animals currently in care.

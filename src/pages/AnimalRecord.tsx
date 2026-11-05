@@ -13,6 +13,23 @@ type Tab = 'profile' | 'care' | 'meds' | 'medical' | 'where' | 'photos' | 'histo
 const TABS: [Tab, string][] = [['profile', 'Profile'], ['care', 'Care'], ['meds', 'Meds'], ['medical', 'Medical'], ['where', 'Where'], ['photos', 'Photos & files'], ['history', 'History']];
 
 const fmt = (d?: string | null) => (d ? shortDate(d) : '—');
+
+/** Care rows for one animal. Phones only hold rows for animals in our care; past animals' history is fetched when opened. */
+function useAnimalRows(table: 'treatments' | 'medications' | 'medical_notes', a: Row) {
+  const local = useTable(table).filter((r) => r.animal_id === a.id);
+  const inCare = STATUS[a.status]?.inCare;
+  const [remote, setRemote] = useState<Row[]>([]);
+  const sig = local.map((r) => r.id).join(',');
+  useEffect(() => {
+    if (inCare) return setRemote([]);
+    let live = true;
+    supabase.from(table).select('*').eq('animal_id', a.id).then(({ data }) => live && setRemote(data ?? []));
+    return () => { live = false; };
+  }, [a.id, inCare, table, sig]);
+  if (inCare) return local;
+  const ids = new Set(local.map((r) => r.id));
+  return [...local, ...remote.filter((r) => !ids.has(r.id))];
+}
 const nowIso = () => new Date().toISOString();
 
 export default function AnimalRecord() {
@@ -49,7 +66,7 @@ export default function AnimalRecord() {
 }
 
 function TestSummary({ a }: { a: Row }) {
-  const tr = useTable('treatments').filter((t) => t.animal_id === a.id);
+  const tr = useAnimalRows('treatments', a);
   const name = a.species === 'cat' ? 'FIV/FeLV test' : 'Quad test (4Dx)';
   const t = latestGiven(tr, (x) => x.kind === 'test' && x.name === name);
   if (!t) return <span className="t13">{a.species === 'cat' ? 'FIV/FeLV' : 'Quad test'}: not recorded</span>;
@@ -193,7 +210,7 @@ function Care({ a }: { a: Row }) {
   const { name } = useProfiles();
   const allTypes = useTable('treatment_types');
   const types = typesFor(allTypes, a.species);
-  const treatments = useTable('treatments').filter((t) => t.animal_id === a.id).sort((x, y) => (y.given_on ?? y.next_due_on).localeCompare(x.given_on ?? x.next_due_on));
+  const treatments = useAnimalRows('treatments', a).sort((x, y) => (y.given_on ?? y.next_due_on).localeCompare(x.given_on ?? x.next_due_on));
   const [adding, setAdding] = useState<{ type?: Row | null; prefill?: Row | null } | null>(null);
   const due = careDue([{ ...a, status: STATUS[a.status]?.inCare ? a.status : 'shelter' }], treatments, allTypes, 36500);
   const latestOf = (t: Row) => treatments.find((x) => x.type_id === t.id && x.given_on);
@@ -386,7 +403,7 @@ function ManageButton({ table, row, label }: { table: string; row: Row; label: s
 function Meds({ a }: { a: Row }) {
   const { me } = useAuth();
   const { name } = useProfiles();
-  const meds = useTable('medications').filter((m) => m.animal_id === a.id);
+  const meds = useAnimalRows('medications', a);
   const current = meds.filter((m) => m.active && !m.ended_on);
   const past = meds.filter((m) => !(m.active && !m.ended_on)).sort((x, y) => (y.ended_on ?? '').localeCompare(x.ended_on ?? ''));
   const [med, setMed] = useState('');
@@ -440,7 +457,7 @@ function Meds({ a }: { a: Row }) {
 function Medical({ a }: { a: Row }) {
   const { me } = useAuth();
   const { name } = useProfiles();
-  const notes = useTable('medical_notes').filter((n) => n.animal_id === a.id).sort((x, y) => y.noted_on.localeCompare(x.noted_on) || y.created_at.localeCompare(x.created_at));
+  const notes = useAnimalRows('medical_notes', a).sort((x, y) => y.noted_on.localeCompare(x.noted_on) || y.created_at.localeCompare(x.created_at));
   const [on, setOn] = useState(today());
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
