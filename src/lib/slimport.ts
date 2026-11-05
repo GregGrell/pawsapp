@@ -153,11 +153,14 @@ export function build(parsed: Parsed[], types: TypeRow[]) {
       intake_on: d(a['Intake Date']), notes: '', final_status: animalStatus(a),
     });
     keep('animals', key, a, 'animals', key);
-    const kg = parseFloat(s(a['Current Weight']));
+    // Weights are kg. Anything over 50 kg is a missing decimal point (e.g. 225 = 22.5); the original stays in sl_raw.
+    let kg = parseFloat(s(a['Current Weight']));
     const on = d(a['Date Weighed']);
-    if (kg > 0 && kg < 150 && on) { // anything heavier is a typo in Shelterluv; the original stays in sl_raw
-      const lbs = /lb/i.test(s(a['Current Weight']));
-      weights.push({ sl_key: `W:${key}:${on}`, animal: key, weighed_on: on, kg: Math.round((lbs ? kg * 0.4536 : kg) * 100) / 100, notes: 'From Shelterluv' });
+    let fixed = false;
+    while (kg > 50) { kg = kg / 10; fixed = true; }
+    if (kg > 0 && on) {
+      weights.push({ sl_key: `W:${key}:${on}`, animal: key, weighed_on: on, kg: Math.round(kg * 100) / 100,
+        notes: fixed ? `From Shelterluv (recorded there as ${s(a['Current Weight'])}; decimal point added)` : 'From Shelterluv' });
     }
     if (s(a['Foster Person ID'])) personFrom(a['Foster Person ID'], a['Foster Person Name'], {
       address: [s(a['Foster Person Street 1']), s(a['Foster Person Street 2']), s(a['Foster Person Zip'])].filter(Boolean).join(', '),
