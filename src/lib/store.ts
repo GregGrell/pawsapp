@@ -265,6 +265,7 @@ async function flush() {
         if (!error && op.table === 'incidents') supabase.functions.invoke('notify', { body: { type: 'incident', id: op.row.id } }).catch(() => {});
         if (!error && op.table === 'animal_movements' && op.row.kind === 'permanent') supabase.functions.invoke('notify', { body: { type: 'animal_out', id: op.row.id } }).catch(() => {});
         if (!error && op.table === 'maintenance_issues') supabase.functions.invoke('notify', { body: { type: 'maintenance', id: op.row.id } }).catch(() => {});
+        if (!error && op.table === 'request_replies') supabase.functions.invoke('notify', { body: { type: 'request_reply', id: op.row.id } }).catch(() => {});
       } else if (op.type === 'upsert') {
         const r = await supabase.from(op.table).upsert(op.row, { onConflict: op.onConflict });
         error = r.error;
@@ -273,6 +274,7 @@ async function flush() {
         for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);
         const r = await q;
         error = r.error;
+        if (!error && op.table === 'requests' && op.patch.done === true && op.match.id) supabase.functions.invoke('notify', { body: { type: 'request_done', id: op.match.id } }).catch(() => {});
       } else if (op.type === 'delete') {
         let q: any = supabase.from(op.table).delete();
         for (const [k, v] of Object.entries(op.match)) q = q.eq(k, v);

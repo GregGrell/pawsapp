@@ -253,9 +253,13 @@ function Requests() {
   const [reply, setReply] = useState('');
   const [photo, setPhoto] = useState<Blob | null>(null);
   const open = requests.filter((r) => !r.done).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const done = requests.filter((r) => r.done && (r.done_at ?? r.created_at) >= weekAgo).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''));
+  const [showDone, setShowDone] = useState(false);
+  const [openDone, setOpenDone] = useState<string | null>(null);
   const initials = (id: string) => name(id).split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
 
-  if (!open.length && !isMgmt) return null;
+  if (!open.length && !done.length && !isMgmt) return null;
   return (
     <section className="card">
       <div className="head">
@@ -284,6 +288,7 @@ function Requests() {
         </div>
       )}
       {!open.length && !composing && <Empty>No open requests.</Empty>}
+      {open.length > 1 && <span className="t13">{open.length} open requests</span>}
       {open.map((r) => (
         <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 }}>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -327,6 +332,35 @@ function Requests() {
           )}
         </div>
       ))}
+      {done.length > 0 && (
+        <>
+          <button className="btn link" style={{ alignSelf: 'flex-start' }} onClick={() => setShowDone(!showDone)}>
+            {showDone ? 'Hide' : 'Show'} done this week ({done.length})
+          </button>
+          {showDone && done.map((r) => {
+            const rs = replies.filter((x) => x.request_id === r.id);
+            return (
+              <div key={r.id} style={{ borderTop: '1px solid var(--line-2)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span className="t14" style={{ color: 'var(--ink-2)' }}>{r.body}</span>
+                <span className="ok">✓ Done by {name(r.done_by)} · {r.done_at ? `${shortDate(today(new Date(r.done_at)))} ${timeOf(r.done_at)}` : ''}</span>
+                <span className="t13">Asked by {name(r.from_user)} · {shortDate(today(new Date(r.created_at)))} {timeOf(r.created_at)}</span>
+                {rs.length > 0 && (
+                  <button className="btn link" style={{ alignSelf: 'flex-start', padding: 0 }} onClick={() => setOpenDone(openDone === r.id ? null : r.id)}>
+                    {openDone === r.id ? 'Hide' : 'Show'} {rs.length} repl{rs.length === 1 ? 'y' : 'ies'}
+                  </button>
+                )}
+                {openDone === r.id && rs.map((x) => (
+                  <div key={x.id} style={{ marginLeft: 12, borderRadius: 10, background: 'var(--soft)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span className="t13"><strong style={{ color: 'var(--ink)' }}>{name(x.user_id)}</strong> · {timeOf(x.created_at)}</span>
+                    {x.body && <span className="t14">{x.body}</span>}
+                    <StoredImage bucket="photos" path={x.photo_path} />
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </>
+      )}
     </section>
   );
 }

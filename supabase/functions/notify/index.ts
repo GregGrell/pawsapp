@@ -69,6 +69,25 @@ async function name(id: string) {
   return data?.full_name ?? 'Someone';
 }
 
+/** Tell the manager who posted a request that it's been done. */
+async function requestDoneAlert(id: string) {
+  const { data: r } = await admin.from('requests').select('*').eq('id', id).single();
+  if (!r?.done || !r.done_by || r.done_by === r.from_user) return 0;
+  if (!(await once(`req-done:${r.id}`))) return 0;
+  const at = new Date(r.done_at ?? Date.now()).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Qatar' });
+  return sendTo([r.from_user], { title: `Done by ${await name(r.done_by)} · ${at}`, body: r.body, url: '#/', tag: `req-done-${r.id}` });
+}
+
+/** Tell the manager who posted a request about a reply to it. */
+async function replyAlert(id: string) {
+  const { data: x } = await admin.from('request_replies').select('*, requests(from_user, body)').eq('id', id).single();
+  const poster = (x as any)?.requests?.from_user;
+  if (!x || !poster || poster === x.user_id) return 0;
+  if (!(await once(`req-reply:${x.id}`))) return 0;
+  const what = x.body?.trim() || (x.photo_path ? 'Sent a photo' : 'Replied');
+  return sendTo([poster], { title: `Reply from ${await name(x.user_id)}`, body: `${what}${x.body && x.photo_path ? ' (with photo)' : ''}\nRe: ${(x as any).requests.body}`, url: '#/', tag: `req-reply-${x.id}` });
+}
+
 async function incidentAlert(id: string) {
   const { data: i } = await admin.from('incidents').select('*').eq('id', id).single();
   if (!i || i.acknowledged_at) return 0;
@@ -176,6 +195,12 @@ async function runSchedule() {
     }
   }
 
+  // Backup: requests done and replies → the manager who posted
+  const { data: rd } = await admin.from('requests').select('id').eq('done', true).gte('done_at', since);
+  for (const r of rd ?? []) if (await requestDoneAlert(r.id)) log.push('request done');
+  const { data: rr } = await admin.from('request_replies').select('id').gte('created_at', since);
+  for (const x of rr ?? []) if (await replyAlert(x.id)) log.push('request reply');
+
   // Leave and sick reports → management
   const { data: lv } = await admin.from('leave_requests').select('*').eq('status', 'pending').gte('created_at', since);
   for (const l of lv ?? []) {
@@ -227,6 +252,14 @@ Deno.serve(async (req) => {
     }
     if (body.type === 'maintenance' && body.id) {
       const n = await maintenanceAlert(String(body.id));
+      return Response.json({ ok: true, sent: n }, { headers: cors });
+    }
+    if (body.type === 'request_done' && body.id) {
+      const n = await requestDoneAlert(String(body.id));
+      return Response.json({ ok: true, sent: n }, { headers: cors });
+    }
+    if (body.type === 'request_reply' && body.id) {
+      const n = await replyAlert(String(body.id));
       return Response.json({ ok: true, sent: n }, { headers: cors });
     }
     if (body.type === 'incident' && body.id) {
