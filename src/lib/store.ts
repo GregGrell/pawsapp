@@ -220,6 +220,12 @@ export function queueUpload(bucket: 'photos' | 'certificates', blob: Blob, folde
   return path;
 }
 
+/** Queue several uploads; the first path goes in the main column, the rest in extra_paths. */
+export function queueUploads(bucket: 'photos' | 'certificates', blobs: Blob[], folder: string) {
+  const paths = blobs.map((b) => queueUpload(bucket, b, folder));
+  return { first: paths[0] ?? null, extra: paths.slice(1) };
+}
+
 export const localFiles = new Map<string, string>();
 
 let syncing: Promise<void> | null = null;

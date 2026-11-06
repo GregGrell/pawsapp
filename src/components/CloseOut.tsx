@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
-import { queueUpload, upsert, type Row } from '../lib/store';
+import { queueUploads, upsert, type Row } from '../lib/store';
 import { PhotoPicker, toast } from './ui';
 
 const OUTCOMES = [
@@ -16,11 +16,11 @@ export default function CloseOut({ item, day, onDone }: { item: Row; day: string
   const { me } = useAuth();
   const [outcome, setOutcome] = useState<string | null>(null);
   const [note, setNote] = useState('');
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
   const save = () => {
     if (!outcome) return;
-    const photo_path = photo ? queueUpload('photos', photo, 'outcomes') : null;
-    upsert('appointment_outcomes', { item_id: item.id, occurs_on: day, outcome, note: note.trim(), photo_path, closed_by: me.id, closed_at: new Date().toISOString() }, 'item_id,occurs_on');
+    const { first: photo_path, extra: extra_paths } = queueUploads('photos', photo, 'outcomes');
+    upsert('appointment_outcomes', { item_id: item.id, occurs_on: day, outcome, note: note.trim(), photo_path, extra_paths, closed_by: me.id, closed_at: new Date().toISOString() }, 'item_id,occurs_on');
     toast('Outcome saved');
     onDone();
   };
@@ -36,7 +36,7 @@ export default function CloseOut({ item, day, onDone }: { item: Row; day: string
         <span>Notes · optional</span>
         <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Vet happy with healing, recheck in 10 days" />
       </label>
-      <PhotoPicker value={photo} onChange={setPhoto} label="Add photo" />
+      <PhotoPicker value={photo} onChange={setPhoto} label="Add photos" />
       <button className="btn" disabled={!outcome} onClick={save}>{outcome ? 'Save outcome' : 'Choose what happened'}</button>
       <button className="btn link" onClick={onDone}>Cancel</button>
     </div>

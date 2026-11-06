@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth';
-import { Empty, Page, Pill, PhotoPicker, StoredImage, toast } from '../components/ui';
+import { Empty, Page, Pill, PhotoPicker, StoredImage, StoredImages, toast } from '../components/ui';
 import { CHIP_RESULT, CONTACT_KIND, FIELD_LABEL, KIND_LABEL, SEX_LABEL, STATUS, STATUS_ORDER, TABLE_LABEL, ageText, careDue, isPositive, latestGiven, testParts, typesFor } from '../lib/animals';
 import { useProfiles, useTable } from '../lib/hooks';
-import { insert, queueUpload, remove, update, type Row } from '../lib/store';
+import { insert, queueUpload, queueUploads, remove, update, type Row } from '../lib/store';
 import { supabase } from '../lib/supabase';
 import { addDays, shortDate, timeOf, today } from '../lib/time';
 import { Avatar } from './Records';
@@ -275,7 +275,7 @@ function Care({ a }: { a: Row }) {
               </div>
               {t.certificate_path && <button className="chip" style={{ background: 'var(--blue-wash)', color: 'var(--blue-dark)', border: 0, cursor: 'pointer', flex: '0 0 auto' }} onClick={() => setOpen(open === t.id ? null : t.id)}>Certificate {open === t.id ? '▴' : '▾'}</button>}
             </div>
-            {open === t.id && <StoredImage bucket="photos" path={t.certificate_path} />}
+            {open === t.id && <StoredImages bucket="photos" path={t.certificate_path} extra={t.extra_paths} />}
             <ManageButton table="treatments" row={t} label={`${t.name} on ${fmt(t.given_on ?? t.next_due_on)}`} />
           </div>
         ))}
@@ -300,7 +300,7 @@ function TreatmentForm({ a, type, prefill, onDone }: { a: Row; type: Row | null;
   const [vet, setVet] = useState(prefill?.vet ?? '');
   const [result, setResult] = useState('');
   const [notes, setNotes] = useState('');
-  const [cert, setCert] = useState<Blob | null>(null);
+  const [cert, setCert] = useState<Blob[]>([]);
   const autoDue = t?.interval_days && given ? addDays(given, t.interval_days) : '';
   const [due, setDue] = useState('');
   const [dueTouched, setDueTouched] = useState(false);
@@ -312,10 +312,10 @@ function TreatmentForm({ a, type, prefill, onDone }: { a: Row; type: Row | null;
   const ok = label && (reminderOnly ? !!due : !!given);
 
   const save = () => {
-    const certificate_path = cert ? queueUpload('photos', cert, 'animals') : null;
+    const { first: certificate_path, extra: extra_paths } = queueUploads('photos', cert, 'animals');
     insert('treatments', {
       animal_id: a.id, type_id: t?.id ?? null, kind, name: label, given_on: reminderOnly ? null : given, next_due_on: due || null,
-      product: product.trim(), manufacturer: manufacturer.trim(), batch: batch.trim(), vet: vet.trim(), result: resultText, notes: notes.trim(), certificate_path,
+      product: product.trim(), manufacturer: manufacturer.trim(), batch: batch.trim(), vet: vet.trim(), result: resultText, notes: notes.trim(), certificate_path, extra_paths,
       created_by: me.id, created_at: nowIso(),
     });
     toast(reminderOnly ? `Reminder set for ${fmt(due)}` : `${label} logged${due ? ` · next due ${fmt(due)}` : ''}`);
@@ -461,7 +461,7 @@ function Medical({ a }: { a: Row }) {
   const [on, setOn] = useState(today());
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [file, setFile] = useState<Blob | null>(null);
+  const [file, setFile] = useState<Blob[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   return (
     <>
@@ -474,9 +474,9 @@ function Medical({ a }: { a: Row }) {
         <label className="field"><span>Details · optional</span><textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)} /></label>
         <PhotoPicker value={file} onChange={setFile} label="Vet report, photo or PDF" accept="image/*,application/pdf" />
         <button className="btn" disabled={!title.trim()} onClick={() => {
-          const file_path = file ? queueUpload('photos', file, 'animals') : null;
-          insert('medical_notes', { animal_id: a.id, noted_on: on, title: title.trim(), body: body.trim(), file_path, created_by: me.id, created_at: nowIso() });
-          setTitle(''); setBody(''); setFile(null); toast('Added');
+          const { first: file_path, extra: extra_paths } = queueUploads('photos', file, 'animals');
+          insert('medical_notes', { animal_id: a.id, noted_on: on, title: title.trim(), body: body.trim(), file_path, extra_paths, created_by: me.id, created_at: nowIso() });
+          setTitle(''); setBody(''); setFile([]); toast('Added');
         }}>Add</button>
       </section>
       <section className="card tight">
@@ -490,7 +490,7 @@ function Medical({ a }: { a: Row }) {
               {n.body && <span className="t14" style={{ whiteSpace: 'pre-wrap' }}>{n.body}</span>}
               {n.file_path && <button className="chip" style={{ background: 'var(--blue-wash)', color: 'var(--blue-dark)', border: 0, cursor: 'pointer' }} onClick={() => setOpen(open === n.id ? null : n.id)}>Attachment {open === n.id ? '▴' : '▾'}</button>}
             </div>
-            {open === n.id && <StoredImage bucket="photos" path={n.file_path} />}
+            {open === n.id && <StoredImages bucket="photos" path={n.file_path} extra={n.extra_paths} />}
             <ManageButton table="medical_notes" row={n} label={n.title} />
           </div>
         ))}
@@ -633,23 +633,27 @@ function ContactLine({ id, fallback }: { id: string; fallback: string }) {
 function Files({ a }: { a: Row }) {
   const { me } = useAuth();
   const files = useTable('animal_files').filter((f) => f.animal_id === a.id).sort((x, y) => y.created_at.localeCompare(x.created_at));
-  const [blob, setBlob] = useState<Blob | null>(null);
+  const [blob, setBlob] = useState<Blob[]>([]);
   const [caption, setCaption] = useState('');
   const add = () => {
-    if (!blob) return;
-    const path = queueUpload('photos', blob, 'animals');
-    const kind = blob.type.startsWith('image/') ? 'photo' : 'document';
-    insert('animal_files', { animal_id: a.id, kind, path, caption: caption.trim(), created_by: me.id, created_at: nowIso() });
-    if (kind === 'photo' && !a.photo_path) update('animals', { id: a.id }, { photo_path: path });
-    setBlob(null); setCaption(''); toast('Added');
+    if (!blob.length) return;
+    let main = a.photo_path;
+    for (const b of blob) {
+      const path = queueUpload('photos', b, 'animals');
+      const kind = b.type.startsWith('image/') ? 'photo' : 'document';
+      insert('animal_files', { animal_id: a.id, kind, path, caption: caption.trim(), created_by: me.id, created_at: nowIso() });
+      if (kind === 'photo' && !main) { main = path; update('animals', { id: a.id }, { photo_path: path }); }
+    }
+    toast(blob.length > 1 ? `${blob.length} added` : 'Added');
+    setBlob([]); setCaption('');
   };
   return (
     <>
       <section className="card">
-        <h2 className="h">Add a photo or document</h2>
-        <PhotoPicker value={blob} onChange={setBlob} label="Photo, passport scan or PDF" accept="image/*,application/pdf" required />
+        <h2 className="h">Add photos or documents</h2>
+        <PhotoPicker value={blob} onChange={setBlob} label="Photos, passport scans or PDFs" accept="image/*,application/pdf" required />
         <label className="field"><span>Caption · optional</span><input value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="e.g. Pet passport page 3" /></label>
-        <button className="btn" disabled={!blob} onClick={add}>Add</button>
+        <button className="btn" disabled={!blob.length} onClick={add}>{blob.length > 1 ? `Add ${blob.length}` : 'Add'}</button>
       </section>
       <section className="card tight">
         <h2 className="h" style={{ paddingBottom: 6 }}>Photos & files · {files.length}</h2>

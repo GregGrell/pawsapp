@@ -80,45 +80,64 @@ export function Pill({ on, onClick, children }: { on: boolean; onClick: () => vo
  * Attach a photo or file: Camera, Gallery or Files.
  * Photos are shrunk before storing so uploads stay small on mobile data.
  */
-export function PhotoPicker({ value, onChange, label = 'Add photo', accept = 'image/*', required }: { value: Blob | null; onChange: (b: Blob | null) => void; label?: string; accept?: string; required?: boolean }) {
+/** Camera / Gallery / Files picker that collects several photos or PDFs. */
+export function PhotoPicker({ value, onChange, label = 'Add photos', accept = 'image/*', required, max = 10 }: { value: Blob[]; onChange: (b: Blob[]) => void; label?: string; accept?: string; required?: boolean; max?: number }) {
   const cam = useRef<HTMLInputElement>(null);
   const gal = useRef<HTMLInputElement>(null);
   const fil = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!value) return setPreview(null);
-    const u = URL.createObjectURL(value);
-    setPreview(u);
-    return () => URL.revokeObjectURL(u);
+    const u = value.map((b) => (b.type.startsWith('image/') ? URL.createObjectURL(b) : ''));
+    setPreviews(u);
+    return () => u.forEach((x) => x && URL.revokeObjectURL(x));
   }, [value]);
   const pick = async (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
+    const fs = [...(e.target.files ?? [])];
     e.target.value = '';
-    if (!f) return;
-    onChange(f.type.startsWith('image/') ? await shrink(f) : f);
+    if (!fs.length) return;
+    setBusy(true);
+    const out: Blob[] = [];
+    for (const f of fs.slice(0, Math.max(0, max - value.length))) out.push(f.type.startsWith('image/') ? await shrink(f) : f);
+    setBusy(false);
+    onChange([...value, ...out]);
   };
-  if (value)
-    return (
-      <div className="attached">
-        {value.type.startsWith('image/') && preview && <img src={preview} alt="" />}
-        <span className="t14" style={{ flex: 1, fontWeight: 600 }}>{value.type === 'application/pdf' ? 'PDF attached' : value.type.startsWith('image/') ? 'Photo attached' : 'File attached'}</span>
-        <button type="button" className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => onChange(null)}>Remove</button>
-      </div>
-    );
   const files = accept.includes('pdf') ? accept : `${accept},application/pdf`;
+  const full = value.length >= max;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <span className="t13" style={{ fontWeight: 600 }}>{label}{required ? '' : ' · optional'}</span>
-      <div className="picker3" role="group" aria-label={label}>
-        <button type="button" className="photo" onClick={() => cam.current?.click()}><Icon name="camera" size={18} color="var(--blue)" /> Camera</button>
-        <button type="button" className="photo" onClick={() => gal.current?.click()}><Icon name="image" size={18} color="var(--blue)" /> Gallery</button>
-        <button type="button" className="photo" onClick={() => fil.current?.click()}><Icon name="file" size={18} color="var(--blue)" /> Files</button>
-      </div>
+      <span className="t13" style={{ fontWeight: 600 }}>{label}{required ? '' : ' · optional'}{value.length ? ` · ${value.length} added` : ''}</span>
+      {value.length > 0 && (
+        <div className="thumbs">
+          {value.map((b, i) => (
+            <div key={i} className="thumbs-item">
+              {previews[i] ? <img src={previews[i]} alt="" /> : <span className="t13" style={{ fontWeight: 600 }}>{b.type === 'application/pdf' ? 'PDF' : 'File'}</span>}
+              <button type="button" aria-label="Remove" onClick={() => onChange(value.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {busy && <span className="t13">Adding…</span>}
+      {!full && (
+        <div className="picker3" role="group" aria-label={label}>
+          <button type="button" className="photo" onClick={() => cam.current?.click()}><Icon name="camera" size={18} color="var(--blue)" /> Camera</button>
+          <button type="button" className="photo" onClick={() => gal.current?.click()}><Icon name="image" size={18} color="var(--blue)" /> Gallery</button>
+          <button type="button" className="photo" onClick={() => fil.current?.click()}><Icon name="file" size={18} color="var(--blue)" /> Files</button>
+        </div>
+      )}
       <input ref={cam} type="file" accept="image/*" capture="environment" hidden onChange={pick} />
-      <input ref={gal} type="file" accept="image/*" hidden onChange={pick} />
-      <input ref={fil} type="file" accept={files} hidden onChange={pick} />
+      <input ref={gal} type="file" accept="image/*" multiple hidden onChange={pick} />
+      <input ref={fil} type="file" accept={files} multiple hidden onChange={pick} />
     </div>
   );
+}
+
+/** Show the main photo plus any extras as a strip; tap one to open it full size. */
+export function StoredImages({ bucket, path, extra }: { bucket: string; path?: string | null; extra?: string[] | null }) {
+  const all = [path, ...(extra ?? [])].filter(Boolean) as string[];
+  if (!all.length) return null;
+  if (all.length === 1) return <StoredImage bucket={bucket} path={all[0]} />;
+  return <div className="thumbs">{all.map((p) => <div key={p} className="thumbs-item"><StoredImage bucket={bucket} path={p} /></div>)}</div>;
 }
 
 async function shrink(file: File, max = 1600): Promise<Blob> {

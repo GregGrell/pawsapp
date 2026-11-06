@@ -8,10 +8,10 @@ import CareDue, { BirthdaysToday } from '../components/CareDue';
 import AnimalsOut from '../components/AnimalsOut';
 import TaskList from '../components/TaskList';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
-import { Empty, Icon, PhotoPicker, StoredImage, toast } from '../components/ui';
+import { Empty, Icon, PhotoPicker, StoredImages, toast } from '../components/ui';
 import { catStyle, hm, itemsOn, openCloseOuts, useProfiles, useStore, useTable } from '../lib/hooks';
 import { buildReport, reportLines } from '../lib/report';
-import { insert, queueUpload, update } from '../lib/store';
+import { insert, queueUploads, update } from '../lib/store';
 import { longDate, minusMinutes, nowHM, shortDate, timeOf, today } from '../lib/time';
 
 export default function Today() {
@@ -251,7 +251,7 @@ function Requests() {
   const [body, setBody] = useState('');
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [reply, setReply] = useState('');
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
   const open = requests.filter((r) => !r.done).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const weekAgo = new Date(Date.now() - 7 * 86400_000).toISOString();
   const done = requests.filter((r) => r.done && (r.done_at ?? r.created_at) >= weekAgo).sort((a, b) => (b.done_at ?? '').localeCompare(a.done_at ?? ''));
@@ -302,7 +302,7 @@ function Requests() {
             <div key={x.id} style={{ marginLeft: 46, borderRadius: 10, background: 'var(--soft)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span className="t13"><strong style={{ color: 'var(--ink)' }}>{name(x.user_id)}</strong> · {timeOf(x.created_at)}</span>
               {x.body && <span className="t14">{x.body}</span>}
-              <StoredImage bucket="photos" path={x.photo_path} />
+              <StoredImages bucket="photos" path={x.photo_path} extra={x.extra_paths} />
             </div>
           ))}
           {replyTo === r.id ? (
@@ -311,12 +311,12 @@ function Requests() {
               <PhotoPicker value={photo} onChange={setPhoto} />
               <button
                 className="btn"
-                disabled={!reply.trim() && !photo}
+                disabled={!reply.trim() && !photo.length}
                 onClick={() => {
-                  const photo_path = photo ? queueUpload('photos', photo, 'replies') : null;
-                  insert('request_replies', { request_id: r.id, user_id: me.id, body: reply.trim(), photo_path, created_at: new Date().toISOString() });
+                  const { first: photo_path, extra: extra_paths } = queueUploads('photos', photo, 'replies');
+                  insert('request_replies', { request_id: r.id, user_id: me.id, body: reply.trim(), photo_path, extra_paths, created_at: new Date().toISOString() });
                   setReply('');
-                  setPhoto(null);
+                  setPhoto([]);
                   setReplyTo(null);
                 }}
               >
@@ -353,7 +353,7 @@ function Requests() {
                   <div key={x.id} style={{ marginLeft: 12, borderRadius: 10, background: 'var(--soft)', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span className="t13"><strong style={{ color: 'var(--ink)' }}>{name(x.user_id)}</strong> · {timeOf(x.created_at)}</span>
                     {x.body && <span className="t14">{x.body}</span>}
-                    <StoredImage bucket="photos" path={x.photo_path} />
+                    <StoredImages bucket="photos" path={x.photo_path} extra={x.extra_paths} />
                   </div>
                 ))}
               </div>

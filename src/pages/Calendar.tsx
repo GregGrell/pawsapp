@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth';
 import CloseOut, { OUTCOME_COLOR, OUTCOME_LABEL } from '../components/CloseOut';
-import { Empty, Icon, Page, StoredImage, toast } from '../components/ui';
+import { Empty, Icon, Page, StoredImages, toast } from '../components/ui';
 import { CATEGORIES, catStyle, hm, itemsOn, useProfiles, useTable } from '../lib/hooks';
 import { insert, update, type Row } from '../lib/store';
 import { Link } from 'react-router-dom';
@@ -66,7 +66,7 @@ export default function Calendar() {
             <div style={{ borderRadius: 10, background: 'var(--soft)', border: '1px solid var(--line)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: OUTCOME_COLOR[out.outcome] }}>{OUTCOME_LABEL[out.outcome]} · closed out by {name(out.closed_by)}</span>
               {out.note && <span className="t14">{out.note}</span>}
-              <StoredImage bucket="photos" path={out.photo_path} />
+              <StoredImages bucket="photos" path={out.photo_path} extra={out.extra_paths} />
             </div>
           )}
           {canEdit && (

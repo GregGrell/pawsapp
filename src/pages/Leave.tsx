@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
-import { Empty, Icon, Page, StoredImage, toast } from '../components/ui';
+import { Empty, Icon, Page, StoredImages, toast } from '../components/ui';
 import { useProfiles, useTable } from '../lib/hooks';
 import { insert, update } from '../lib/store';
 import { addDays, dayLabel, shortDate, today } from '../lib/time';
@@ -74,7 +74,7 @@ export default function Leave() {
                 <span className="t13">Day {x.consecutive_day}{x.certificate_path ? ' · certificate uploaded' : x.consecutive_day === 1 ? ' · no certificate needed' : ''}</span>
                 {x.note && <span className="t14">{x.note}</span>}
               </div>
-              {x.certificate_path && <StoredImage bucket="certificates" path={x.certificate_path} />}
+              <StoredImages bucket="certificates" path={x.certificate_path} extra={x.extra_paths} />
             </div>
           ))}
         </section>

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
-import { Empty, Page, Pill, PhotoPicker, StoredImage, toast } from '../components/ui';
+import { Empty, Page, Pill, PhotoPicker, StoredImages, toast } from '../components/ui';
 import { useProfiles, useTable } from '../lib/hooks';
-import { insert, queueUpload, update, type Row } from '../lib/store';
+import { insert, queueUploads, update, type Row } from '../lib/store';
 import { shortDate, timeOf, today } from '../lib/time';
 
 const STATUS: Record<string, { label: string; bg: string; fg: string }> = {
@@ -39,17 +39,17 @@ function ReportForm() {
   const [desc, setDesc] = useState('');
   const [where, setWhere] = useState('');
   const [urgent, setUrgent] = useState(false);
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
   const send = () => {
-    const photo_path = photo ? queueUpload('photos', photo, 'maintenance') : null;
-    insert('maintenance_issues', { reported_by: me.id, created_at: new Date().toISOString(), location: where, description: desc.trim(), urgent, photo_path, status: 'open', fix_note: '' });
-    setDesc(''); setWhere(''); setUrgent(false); setPhoto(null);
+    const { first: photo_path, extra: extra_paths } = queueUploads('photos', photo, 'maintenance');
+    insert('maintenance_issues', { reported_by: me.id, created_at: new Date().toISOString(), location: where, description: desc.trim(), urgent, photo_path, extra_paths, status: 'open', fix_note: '' });
+    setDesc(''); setWhere(''); setUrgent(false); setPhoto([]);
     toast(urgent ? 'Reported — management alerted' : 'Reported');
   };
   return (
     <section className="card">
       <h2 className="h">Report a problem</h2>
-      <PhotoPicker value={photo} onChange={setPhoto} label="Photo of the problem" />
+      <PhotoPicker value={photo} onChange={setPhoto} label="Photos of the problem" />
       <label className="field"><span>What's wrong?</span><textarea rows={3} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Latch on gate broken, door won't lock" /></label>
       <label className="field">
         <span>Where?</span>
@@ -74,12 +74,12 @@ function Issue({ i }: { i: Row }) {
   const { name } = useProfiles();
   const [fixing, setFixing] = useState(false);
   const [note, setNote] = useState('');
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
   const st = STATUS[i.status];
   const day = today(new Date(i.created_at));
   const markFixed = () => {
-    const fix_photo_path = photo ? queueUpload('photos', photo, 'maintenance') : null;
-    update('maintenance_issues', { id: i.id }, { status: 'fixed', fix_note: note.trim(), fix_photo_path, updated_by: me.id, updated_at: new Date().toISOString() });
+    const { first: fix_photo_path, extra: fix_extra_paths } = queueUploads('photos', photo, 'maintenance');
+    update('maintenance_issues', { id: i.id }, { status: 'fixed', fix_note: note.trim(), fix_photo_path, fix_extra_paths, updated_by: me.id, updated_at: new Date().toISOString() });
     setFixing(false);
     toast('Marked fixed');
   };
@@ -94,12 +94,12 @@ function Issue({ i }: { i: Row }) {
         <span className="t13">{i.location || 'No location'} · {name(i.reported_by)} · {day === today() ? 'today' : shortDate(day)} {timeOf(i.created_at)}</span>
         {i.status === 'in_progress' && <span className="ok">{name(i.updated_by)} is on it</span>}
       </div>
-      <StoredImage bucket="photos" path={i.photo_path} />
+      <StoredImages bucket="photos" path={i.photo_path} extra={i.extra_paths} />
       {i.status === 'fixed' && (
         <div style={{ borderRadius: 10, background: 'var(--soft)', border: '1px solid var(--line)', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <span className="ok">Fixed by {name(i.updated_by)} · {i.updated_at ? shortDate(today(new Date(i.updated_at))) : ''}</span>
           {i.fix_note && <span className="t14">{i.fix_note}</span>}
-          <StoredImage bucket="photos" path={i.fix_photo_path} />
+          <StoredImages bucket="photos" path={i.fix_photo_path} extra={i.fix_extra_paths} />
         </div>
       )}
       {i.status !== 'fixed' && !fixing && me.role !== 'volunteer' && (
@@ -112,7 +112,7 @@ function Issue({ i }: { i: Row }) {
       )}
       {fixing && (
         <div className="panel" style={{ width: '100%' }}>
-          <PhotoPicker value={photo} onChange={setPhoto} label="Photo of the fix" />
+          <PhotoPicker value={photo} onChange={setPhoto} label="Photos of the fix" />
           <label className="field"><span>What was done? · optional</span><textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Replaced latch, tested" /></label>
           <button className="btn" onClick={markFixed}>Mark fixed</button>
           <button className="btn link" onClick={() => setFixing(false)}>Cancel</button>

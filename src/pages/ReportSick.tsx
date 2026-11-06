@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { Icon, Page, PhotoPicker } from '../components/ui';
 import { useTable } from '../lib/hooks';
-import { insert, queueUpload } from '../lib/store';
+import { insert, queueUploads } from '../lib/store';
 import { addDays, longDate, today } from '../lib/time';
 
 export default function ReportSick() {
@@ -14,11 +14,11 @@ export default function ReportSick() {
   const already = sick.find((x) => x.user_id === me.id && x.sick_on === d);
   const autoDay = yesterday ? yesterday.consecutive_day + 1 : 1;
   const [second, setSecond] = useState(autoDay > 1);
-  const [cert, setCert] = useState<Blob | null>(null);
+  const [cert, setCert] = useState<Blob[]>([]);
   const [note, setNote] = useState('');
   const [sent, setSent] = useState(false);
   const day = second ? Math.max(autoDay, 2) : 1;
-  const canSend = !second || !!cert;
+  const canSend = !second || cert.length > 0;
 
   if (already || sent)
     return (
@@ -54,7 +54,7 @@ export default function ReportSick() {
         ) : (
           <div className="field">
             <span className="h">Sick certificate · required</span>
-            <PhotoPicker value={cert} onChange={setCert} label="Take photo or upload PDF" accept="image/*,application/pdf" required />
+            <PhotoPicker value={cert} onChange={setCert} label="Photos or PDF (add each page)" accept="image/*,application/pdf" required />
             <span className="note">Only management can see certificates.</span>
           </div>
         )}
@@ -63,8 +63,8 @@ export default function ReportSick() {
           className="btn"
           disabled={!canSend}
           onClick={() => {
-            const certificate_path = cert ? queueUpload('certificates', cert, me.id) : null;
-            insert('sick_reports', { user_id: me.id, sick_on: d, consecutive_day: day, certificate_path, note: note.trim(), created_at: new Date().toISOString() });
+            const { first: certificate_path, extra: extra_paths } = queueUploads('certificates', cert, me.id);
+            insert('sick_reports', { user_id: me.id, sick_on: d, consecutive_day: day, certificate_path, extra_paths, note: note.trim(), created_at: new Date().toISOString() });
             setSent(true);
           }}
         >

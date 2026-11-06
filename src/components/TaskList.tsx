@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
 import { itemsOn, useProfiles, useTable } from '../lib/hooks';
-import { queueUpload, upsert, type Row } from '../lib/store';
+import { queueUploads, upsert, type Row } from '../lib/store';
 import { timeOf, today } from '../lib/time';
-import { Empty, Icon, PhotoPicker, StoredImage, toast } from './ui';
+import { Empty, Icon, PhotoPicker, StoredImages, toast } from './ui';
 
 export function useTasksOn(day: string) {
   const items = useTable('calendar_items');
@@ -19,17 +19,17 @@ export default function TaskList({ day = today(), limit }: { day?: string; limit
   const { name } = useProfiles();
   const list = useTasksOn(day);
   const [finishing, setFinishing] = useState<string | null>(null);
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
   const shown = limit ? list.slice(0, limit) : list;
 
   if (!list.length) return <Empty>No tasks for this day.</Empty>;
 
   const claim = (t: Row) => upsert('task_completions', { item_id: t.id, occurs_on: day, status: 'claimed', claimed_by: me.id }, 'item_id,occurs_on');
   const finish = (t: Row, c?: Row) => {
-    const photo_path = photo ? queueUpload('photos', photo, 'tasks') : null;
-    upsert('task_completions', { item_id: t.id, occurs_on: day, status: 'done', claimed_by: c?.claimed_by ?? me.id, done_by: me.id, done_at: new Date().toISOString(), photo_path }, 'item_id,occurs_on');
+    const { first: photo_path, extra: extra_paths } = queueUploads('photos', photo, 'tasks');
+    upsert('task_completions', { item_id: t.id, occurs_on: day, status: 'done', claimed_by: c?.claimed_by ?? me.id, done_by: me.id, done_at: new Date().toISOString(), photo_path, extra_paths }, 'item_id,occurs_on');
     setFinishing(null);
-    setPhoto(null);
+    setPhoto([]);
     toast('Task done');
   };
 
@@ -66,12 +66,12 @@ export default function TaskList({ day = today(), limit }: { day?: string; limit
             </div>
             {finishing === t.id && (
               <div className="panel" style={{ width: '100%' }}>
-                <PhotoPicker value={photo} onChange={setPhoto} label="Photo of the finished job" />
+                <PhotoPicker value={photo} onChange={setPhoto} label="Photos of the finished job" />
                 <button className="btn" onClick={() => finish(t, c)}>Mark done</button>
-                <button className="btn link" onClick={() => { setFinishing(null); setPhoto(null); }}>Cancel</button>
+                <button className="btn link" onClick={() => { setFinishing(null); setPhoto([]); }}>Cancel</button>
               </div>
             )}
-            {done && c!.photo_path && <StoredImage bucket="photos" path={c!.photo_path} />}
+            {done && <StoredImages bucket="photos" path={c!.photo_path} extra={c!.extra_paths} />}
           </div>
         );
       })}

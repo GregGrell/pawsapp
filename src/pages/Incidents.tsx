@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
-import { Empty, Page, PhotoPicker, StoredImage, toast } from '../components/ui';
+import { Empty, Page, PhotoPicker, StoredImages, toast } from '../components/ui';
 import { useProfiles, useTable } from '../lib/hooks';
-import { insert, queueUpload, update } from '../lib/store';
+import { insert, queueUploads, update } from '../lib/store';
 import { shortDate, timeOf, today } from '../lib/time';
 
 export default function Incidents() {
@@ -12,12 +12,12 @@ export default function Incidents() {
   const kennels = useTable('kennels').filter((k) => k.active);
   const [desc, setDesc] = useState('');
   const [where, setWhere] = useState('');
-  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [photo, setPhoto] = useState<Blob[]>([]);
 
   const report = () => {
-    const photo_path = photo ? queueUpload('photos', photo, 'incidents') : null;
-    insert('incidents', { reported_by: me.id, created_at: new Date().toISOString(), location: where, description: desc.trim(), photo_path });
-    setDesc(''); setWhere(''); setPhoto(null);
+    const { first: photo_path, extra: extra_paths } = queueUploads('photos', photo, 'incidents');
+    insert('incidents', { reported_by: me.id, created_at: new Date().toISOString(), location: where, description: desc.trim(), photo_path, extra_paths });
+    setDesc(''); setWhere(''); setPhoto([]);
     toast(navigator.onLine ? 'Reported — management alerted' : 'Saved — management will be alerted when you have signal');
   };
 
@@ -51,7 +51,7 @@ export default function Incidents() {
               <span className="t13">{shortDate(today(new Date(i.created_at)))} {timeOf(i.created_at)} · {i.location || 'No location'} · {name(i.reported_by)}</span>
               {i.acknowledged_at ? <span className="ok">Seen by {name(i.acknowledged_by)}</span> : <span className="bad">Not yet acknowledged</span>}
             </div>
-            <StoredImage bucket="photos" path={i.photo_path} />
+            <StoredImages bucket="photos" path={i.photo_path} extra={i.extra_paths} />
             {isMgmt && !i.acknowledged_at && (
               <button className="btn sm" onClick={() => update('incidents', { id: i.id }, { acknowledged_by: me.id, acknowledged_at: new Date().toISOString() })}>Acknowledge</button>
             )}

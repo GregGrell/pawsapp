@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../auth';
-import { Empty, Icon, Page, PhotoPicker, StoredImage, toast } from '../components/ui';
+import { Empty, Icon, Page, PhotoPicker, StoredImages, toast } from '../components/ui';
 import { money, useProfiles, useStore, useTable } from '../lib/hooks';
-import { insert, queueUpload } from '../lib/store';
+import { insert, queueUploads } from '../lib/store';
 import { supabase } from '../lib/supabase';
 import { addDays, shortDate, today } from '../lib/time';
 
@@ -90,12 +90,12 @@ function DonationForm() {
   const [amount, setAmount] = useState('');
   const [donor, setDonor] = useState('');
   const [note, setNote] = useState('');
-  const [receipt, setReceipt] = useState<Blob | null>(null);
+  const [receipt, setReceipt] = useState<Blob[]>([]);
   const v = parseFloat(amount);
   const submit = () => {
-    const receipt_path = receipt ? queueUpload('photos', receipt, 'donations') : null;
-    insert('cash_donations', { amount: v, donor: donor.trim(), note: note.trim(), receipt_path, received_by: me.id, received_on: today(), created_at: new Date().toISOString() });
-    setAmount(''); setDonor(''); setNote(''); setReceipt(null);
+    const { first: receipt_path, extra: extra_paths } = queueUploads('photos', receipt, 'donations');
+    insert('cash_donations', { amount: v, donor: donor.trim(), note: note.trim(), receipt_path, extra_paths, received_by: me.id, received_on: today(), created_at: new Date().toISOString() });
+    setAmount(''); setDonor(''); setNote(''); setReceipt([]);
     toast(`Donation of QAR ${money(v)} logged`);
   };
   return (
@@ -106,7 +106,7 @@ function DonationForm() {
       <label className="field"><span>Note · optional</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Donation box, adoption day" /></label>
       <div className="field">
         <span>Receipt given · optional</span>
-        <PhotoPicker value={receipt} onChange={setReceipt} label="Photo of the receipt" />
+        <PhotoPicker value={receipt} onChange={setReceipt} label="Photos of the receipt" />
       </div>
       <button className="btn" disabled={!(v > 0)} onClick={submit}>{v > 0 ? `Log donation · QAR ${money(v)}` : 'Enter the amount'}</button>
     </section>
@@ -135,7 +135,7 @@ function MyDonations() {
               ? <span className="chip" style={{ background: 'var(--amber-tint)', color: 'var(--amber)' }}>Waiting for signal</span>
               : <span className="chip" style={{ background: '#E6F4EA', color: '#166534' }}>✓ Logged</span>}
           </div>
-          {open === d.id && <StoredImage bucket="photos" path={d.receipt_path} />}
+          {open === d.id && <StoredImages bucket="photos" path={d.receipt_path} extra={d.extra_paths} />}
         </div>
       ))}
     </section>
@@ -190,7 +190,7 @@ function PotHistory() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', color: x.amount > 0 ? '#D1007A' : 'var(--ink)' }}>{x.amount > 0 ? '+' : '−'} {money(Math.abs(x.amount))}</span>
           </div>
-          {open === x.id && <StoredImage bucket="photos" path={x.r.receipt_path} />}
+          {open === x.id && <StoredImages bucket="photos" path={x.r.receipt_path} extra={x.r.extra_paths} />}
         </div>
       ))}
     </section>
@@ -238,24 +238,24 @@ function SpendForm({ available }: { available: number }) {
   const { me } = useAuth();
   const [amount, setAmount] = useState('');
   const [desc, setDesc] = useState('');
-  const [receipt, setReceipt] = useState<Blob | null>(null);
+  const [receipt, setReceipt] = useState<Blob[]>([]);
   const [noReceipt, setNoReceipt] = useState(false);
   const [reason, setReason] = useState('');
   const v = parseFloat(amount);
-  const ok = v > 0 && desc.trim() && (receipt || (noReceipt && reason.trim()));
+  const ok = v > 0 && desc.trim() && (receipt.length || (noReceipt && reason.trim()));
   let label = 'Log spend';
   if (!(v > 0) || !desc.trim()) label = 'Enter amount and what it was for';
-  else if (!receipt && !noReceipt) label = 'Add a receipt or press NO RECEIPT';
+  else if (!receipt.length && !noReceipt) label = 'Add a receipt or press NO RECEIPT';
   else if (noReceipt && !reason.trim()) label = 'Give a reason for no receipt';
   else label = `Log spend · QAR ${money(v)}`;
 
   const submit = () => {
-    const receipt_path = receipt ? queueUpload('photos', receipt, 'receipts') : null;
+    const { first: receipt_path, extra: extra_paths } = queueUploads('photos', receipt, 'receipts');
     insert('petty_cash_spends', {
-      amount: v, description: desc.trim(), receipt_path, no_receipt_reason: noReceipt ? reason.trim() : null,
+      amount: v, description: desc.trim(), receipt_path, extra_paths, no_receipt_reason: noReceipt ? reason.trim() : null,
       spent_by: me.id, spent_on: today(), created_at: new Date().toISOString(),
     });
-    setAmount(''); setDesc(''); setReceipt(null); setNoReceipt(false); setReason('');
+    setAmount(''); setDesc(''); setReceipt([]); setNoReceipt(false); setReason('');
     toast('Spend logged');
   };
 
@@ -266,13 +266,13 @@ function SpendForm({ available }: { available: number }) {
       <label className="field"><span>What was it for?</span><input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Cat litter, 4 bags" /></label>
       <div className="field">
         <span>Receipt · required</span>
-        {!noReceipt && !receipt && (
+        {!noReceipt && !receipt.length && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <PhotoPicker value={receipt} onChange={setReceipt} label="Photo of receipt" required />
             <button type="button" className="btn" style={{ minHeight: 48, background: '#fff', color: 'var(--amber)', border: '2px solid #B45309', fontWeight: 800, letterSpacing: '0.04em' }} onClick={() => setNoReceipt(true)}>NO RECEIPT</button>
           </div>
         )}
-        {receipt && <PhotoPicker value={receipt} onChange={setReceipt} required />}
+        {receipt.length > 0 && <PhotoPicker value={receipt} onChange={setReceipt} required />}
         {noReceipt && (
           <div className="banner amber" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8, padding: 12 }}>
             <div className="head">
@@ -317,7 +317,7 @@ function Transactions() {
             </div>
             <span style={{ fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', color: x.amount > 0 ? 'var(--blue)' : 'var(--ink)' }}>{x.amount > 0 ? '+' : '−'} {money(Math.abs(x.amount))}</span>
           </div>
-          {open === x.id && <StoredImage bucket="photos" path={x.r.receipt_path} />}
+          {open === x.id && <StoredImages bucket="photos" path={x.r.receipt_path} extra={x.r.extra_paths} />}
         </div>
       ))}
     </section>

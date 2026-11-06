@@ -121,6 +121,11 @@ h1, h2, h3, p { margin: 0; }
 .photo { min-height: 56px; border-radius: 12px; border: 2px dashed #8FA3AE; background: var(--soft); color: var(--blue); font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; }
 .attached { min-height: 52px; border-radius: 12px; background: var(--blue-wash); border: 1px solid var(--blue-line); padding: 0 12px; display: flex; align-items: center; gap: 10px; }
 .attached img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; }
+.thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.thumbs-item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--blue-wash); border: 1px solid var(--blue-line); display: flex; align-items: center; justify-content: center; }
+.thumbs-item img, .thumbs-item .thumb { width: 100%; height: 100%; max-height: none; object-fit: cover; border-radius: 0; }
+.thumbs-item a { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; }
+.thumbs-item button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 13px; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 17px; line-height: 1; cursor: pointer; }
 .thumb { width: 100%; max-height: 240px; object-fit: cover; border-radius: 10px; }
 
 .nav { position: fixed; bottom: 0; left: 0; right: 0; max-width: 560px; margin: 0 auto; background: var(--card); border-top: 1px solid var(--line); padding: 6px 6px calc(10px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); z-index: 10; }
