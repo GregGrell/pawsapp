@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { Empty, Icon, Page, StoredImages, toast } from '../components/ui';
 import { useProfiles, useTable } from '../lib/hooks';
-import { insert, update } from '../lib/store';
+import { insert, remove, update } from '../lib/store';
 import { addDays, dayLabel, shortDate, today } from '../lib/time';
 
 const KIND: Record<string, string> = { day_off: 'Day off', annual: 'Annual leave', other: 'Other leave' };
@@ -21,6 +21,7 @@ export default function Leave() {
   const leave = useTable('leave_requests');
   const sick = useTable('sick_reports');
   const [form, setForm] = useState(false);
+  const [book, setBook] = useState(false);
   const d = today();
   const mine = leave.filter((l) => l.user_id === me.id).sort((a, b) => b.start_on.localeCompare(a.start_on));
   const pending = leave.filter((l) => l.status === 'pending');
@@ -38,6 +39,9 @@ export default function Leave() {
       </div>
 
       {form && <RequestForm onDone={() => setForm(false)} />}
+
+      {isMgmt && !book && <button className="btn ghost" onClick={() => setBook(true)}>Book leave for a team member</button>}
+      {isMgmt && book && <BookForm onDone={() => setBook(false)} />}
 
       {isMgmt && (
         <section className="card tight">
@@ -112,8 +116,12 @@ export default function Leave() {
               </div>
               <div className="grow">
                 <span className="t15">{name(l.user_id)}</span>
-                <span className="t13">{KIND[l.kind]}{l.end_on !== l.start_on ? ` to ${shortDate(l.end_on)}` : ''} · {STATUS_STYLE[l.status].label.toLowerCase()}</span>
+                <span className="t13">{KIND[l.kind]}{l.end_on !== l.start_on ? ` to ${shortDate(l.end_on)}` : ''} · {l.added_by ? `booked by ${name(l.added_by)}` : STATUS_STYLE[l.status].label.toLowerCase()}</span>
+                {l.note && <span className="t13">{l.note}</span>}
               </div>
+              {isMgmt && (
+                <button className="btn link sm" style={{ color: 'var(--red)' }} onClick={() => { if (confirm(`Cancel ${name(l.user_id)}'s leave (${range(l.start_on, l.end_on)})?`)) { remove('leave_requests', { id: l.id }); toast('Leave cancelled'); } }}>Cancel</button>
+              )}
             </div>
           );
         })}
@@ -155,6 +163,59 @@ function RequestForm({ onDone }: { onDone: () => void }) {
       >
         Send to management
       </button>
+    </section>
+  );
+}
+
+/** Management: put someone on leave between two dates. It counts as approved straight away. */
+function BookForm({ onDone }: { onDone: () => void }) {
+  const { me } = useAuth();
+  const { list, name } = useProfiles();
+  const leave = useTable('leave_requests');
+  const d = today();
+  const team = list.filter((p) => p.active && (p.role === 'staff' || p.role === 'management')).sort((a, b) => (a.full_name ?? '').localeCompare(b.full_name ?? ''));
+  const [who, setWho] = useState('');
+  const [kind, setKind] = useState('annual');
+  const [from, setFrom] = useState(d);
+  const [to, setTo] = useState(d);
+  const [note, setNote] = useState('');
+  const end = to < from ? from : to;
+  const already = leave.filter((o) => o.user_id === who && o.status === 'approved' && o.start_on <= end && o.end_on >= from);
+  const clash = leave.filter((o) => o.user_id !== who && o.status === 'approved' && o.start_on <= end && o.end_on >= from);
+  const n = daysBetween(from, end);
+  return (
+    <section className="card blue">
+      <h2 className="h">Book leave for a team member</h2>
+      <label className="field">
+        <span>Who</span>
+        <select value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">Choose…</option>
+          {team.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+        </select>
+      </label>
+      <div className="pills">
+        {Object.entries(KIND).map(([k, l]) => <button key={k} className="pill" aria-pressed={kind === k} onClick={() => setKind(k)}>{l.replace(' leave', '')}</button>)}
+      </div>
+      <div className="grid2">
+        <label className="field"><span>From</span><input type="date" value={from} onChange={(e) => { setFrom(e.target.value); if (to < e.target.value) setTo(e.target.value); }} /></label>
+        <label className="field"><span>To (last day off)</span><input type="date" value={end} min={from} onChange={(e) => setTo(e.target.value)} /></label>
+      </div>
+      <label className="field"><span>Note · optional</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Agreed by email, home leave" /></label>
+      {already.length > 0 && <span className="warn">{name(who)} already has leave in these dates.</span>}
+      {clash.length > 0 && <span className="warn">{[...new Set(clash.map((c) => name(c.user_id)))].join(', ')} also off during these dates.</span>}
+      <button
+        className="btn"
+        disabled={!who}
+        onClick={() => {
+          const at = new Date().toISOString();
+          insert('leave_requests', { user_id: who, kind, start_on: from, end_on: end, note: note.trim(), status: 'approved', decided_by: me.id, decided_at: at, added_by: me.id, created_at: at });
+          toast(`${name(who)} booked on leave · ${n} day${n > 1 ? 's' : ''}`);
+          onDone();
+        }}
+      >
+        {who ? `Book ${n} day${n > 1 ? 's' : ''} for ${name(who)}` : 'Choose who'}
+      </button>
+      <button className="btn link" onClick={onDone}>Cancel</button>
     </section>
   );
 }

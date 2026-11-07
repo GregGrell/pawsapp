@@ -214,7 +214,7 @@ async function runSchedule() {
   // Leave decisions → the person
   const { data: decided } = await admin.from('leave_requests').select('*').neq('status', 'pending').gte('decided_at', since);
   for (const l of decided ?? []) {
-    if (await once(`leave-decision:${l.id}`)) await sendTo([l.user_id], { title: `Leave ${l.status}`, body: `${l.start_on}${l.end_on !== l.start_on ? ` to ${l.end_on}` : ''}`, url: '#/leave' });
+    if (await once(`leave-decision:${l.id}`)) await sendTo([l.user_id], { title: l.added_by ? `Leave booked for you by ${await name(l.added_by)}` : `Leave ${l.status}`, body: `${l.start_on}${l.end_on !== l.start_on ? ` to ${l.end_on}` : ''}`, url: '#/leave' });
   }
 
   // Tidy old keys

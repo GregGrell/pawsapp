@@ -4,7 +4,7 @@ import { useAuth } from '../auth';
 import { catStyle, hm, itemsOn, useProfiles, useTable } from '../lib/hooks';
 import { latestFor, reasonText } from '../lib/presence';
 import { insert, update } from '../lib/store';
-import { nowHM, shortDate, timeOf, today } from '../lib/time';
+import { addDays, nowHM, shortDate, timeOf, today } from '../lib/time';
 import { Icon, NowOrTime, toast } from './ui';
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
@@ -170,20 +170,25 @@ export function TeamStatus() {
   const visitors = useTable('visitors');
   const d = today();
   const todays = events.filter((e) => today(new Date(e.at)) === d);
-  const people = list.filter((p) => p.active && (p.role === 'staff' || todays.some((e) => e.user_id === p.id)));
+  const leaveToday = (id: string) => leave.find((l) => l.user_id === id && l.status === 'approved' && l.start_on <= d && l.end_on >= d);
+  const people = list.filter((p) => p.active && (p.role === 'staff' || todays.some((e) => e.user_id === p.id) || (p.role === 'management' && leaveToday(p.id))));
 
-  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none' | 'remote'; text: string; vol?: boolean; visitor?: boolean; vid?: string; vin?: string };
+  type R = { key: string; label: string; sub?: string; state: 'on' | 'off' | 'none' | 'remote' | 'leave'; text: string; vol?: boolean; visitor?: boolean; vid?: string; vin?: string };
   const rows: R[] = people.map((p) => {
     const last = latestFor(todays, p.id);
     const isSick = sick.some((s) => s.user_id === p.id && s.sick_on === d);
-    const onLeave = leave.some((l) => l.user_id === p.id && l.status === 'approved' && l.start_on <= d && l.end_on >= d);
+    const onLeave = leaveToday(p.id);
     let state: R['state'] = 'none';
     let text = 'Not in yet today';
     if (last?.event === 'in' && last.remote) { state = 'remote'; text = `Working from home since ${timeOf(last.at)}`; }
     else if (last?.event === 'in') { state = 'on'; text = `On site since ${timeOf(last.at)}`; }
     else if (last?.event === 'out') { state = 'off'; text = p.role === 'volunteer' ? `Left ${timeOf(last.at)}` : `${reasonText(last)} · left ${timeOf(last.at)}`; }
     else if (isSick) { state = 'off'; text = 'Off sick'; }
-    else if (onLeave) { state = 'off'; text = 'On leave'; }
+    else if (onLeave) {
+      state = 'leave';
+      const kind = onLeave.kind === 'annual' ? 'Annual leave' : onLeave.kind === 'day_off' ? 'Day off' : 'On leave';
+      text = onLeave.end_on === d ? `${kind} · back tomorrow` : `${kind} · back ${shortDate(addDays(onLeave.end_on, 1))}`;
+    }
     return { key: p.id, label: name(p.id), sub: p.role === 'volunteer' ? 'Volunteer' : undefined, state, text, vol: p.role === 'volunteer' };
   });
   for (const v of visitors.filter((v) => today(new Date(v.signed_in_at)) === d)) {
@@ -194,12 +199,12 @@ export function TeamStatus() {
     });
   }
   if (!rows.length) return null;
-  const order = { on: 0, remote: 1, off: 2, none: 3 };
+  const order = { on: 0, remote: 1, off: 2, none: 3, leave: 4 };
   rows.sort((a, b) => order[a.state] - order[b.state] || Number(!!a.visitor) - Number(!!b.visitor));
 
   const onCount = rows.filter((r) => r.state === 'on').reduce((n, r) => n + 1 + (r.visitor ? Number(r.label.match(/\+ (\d+)$/)?.[1] ?? 0) : 0), 0);
-  const dot = (r: R) => (r.state === 'remote' ? 'var(--blue)' : r.state === 'on' ? (r.vol || r.visitor ? '#86D7A2' : '#16A34A') : r.state === 'off' ? 'var(--amber)' : '#C9D2CE');
-  const badgeBg = (r: R) => (r.state === 'remote' ? 'var(--blue-wash)' : r.state === 'on' ? (r.vol || r.visitor ? '#F0FAF3' : '#E6F4EA') : r.state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)');
+  const dot = (r: R) => (r.state === 'leave' ? '#7C3AED' : r.state === 'remote' ? 'var(--blue)' : r.state === 'on' ? (r.vol || r.visitor ? '#86D7A2' : '#16A34A') : r.state === 'off' ? 'var(--amber)' : '#C9D2CE');
+  const badgeBg = (r: R) => (r.state === 'leave' ? '#F3E8FF' : r.state === 'remote' ? 'var(--blue-wash)' : r.state === 'on' ? (r.vol || r.visitor ? '#F0FAF3' : '#E6F4EA') : r.state === 'off' ? 'var(--amber-tint)' : 'var(--line-2)');
   return (
     <section className="card tight" aria-label="On site today">
       <div className="head" style={{ paddingBottom: 6 }}>
@@ -211,13 +216,13 @@ export function TeamStatus() {
           <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 6, flexShrink: 0, background: dot(r), border: r.visitor && r.state === 'on' ? '1.5px solid #16A34A' : undefined }} />
           <div className="grow">
             <span className="t15">{r.label}{r.sub && <span className="t13" style={{ fontWeight: 500 }}> · {r.sub}</span>}</span>
-            <span className="t13" style={r.state === 'off' && !r.visitor ? { color: 'var(--amber)', fontWeight: 600 } : undefined}>
-              <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'remote' ? 'Working from home. ' : r.state === 'off' ? 'Off site. ' : ''}</span>{r.text}
+            <span className="t13" style={r.state === 'off' && !r.visitor ? { color: 'var(--amber)', fontWeight: 600 } : r.state === 'leave' ? { color: '#6B21A8', fontWeight: 600 } : undefined}>
+              <span className="sr-only">{r.state === 'on' ? 'On site. ' : r.state === 'remote' ? 'Working from home. ' : r.state === 'off' ? 'Off site. ' : r.state === 'leave' ? 'On leave. ' : ''}</span>{r.text}
             </span>
           </div>
           {r.vid && <NowOrTime label="Sign out" after={r.vin} onPick={(at) => signOutVisitor(r.vid!, r.label, at)} />}
-          {!r.vid && <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'remote' ? 'var(--blue-dark)' : r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
-            {r.state === 'remote' ? 'HOME' : r.state === 'on' ? 'ON' : 'OFF'}
+          {!r.vid && <span style={{ fontSize: 12, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: badgeBg(r), color: r.state === 'leave' ? '#6B21A8' : r.state === 'remote' ? 'var(--blue-dark)' : r.state === 'on' ? '#166534' : r.state === 'off' ? 'var(--amber)' : 'var(--muted)' }}>
+            {r.state === 'leave' ? 'LEAVE' : r.state === 'remote' ? 'HOME' : r.state === 'on' ? 'ON' : 'OFF'}
           </span>}
         </div>
       ))}

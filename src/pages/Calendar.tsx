@@ -100,7 +100,7 @@ export default function Calendar() {
               <button key={x} className={`${x === day ? 'on' : ''} ${x === d ? 'today' : ''}`} onClick={() => setDay(x)} aria-label={`${longDate(x)}, ${count} entries${bdays ? `, ${bdays} birthday${bdays > 1 ? 's' : ''}` : ''}`}>
                 <span>{dow}</span>
                 <b>{num}</b>
-                <span style={{ fontSize: 10 }}>{bdays ? '🎂' : ''}{count ? '•'.repeat(Math.min(count, 3)) : bdays ? '' : ' '}</span>
+                <span style={{ fontSize: 10 }}>{bdays ? `🎂${bdays > 1 ? bdays : ''}` : ''}{count ? '•'.repeat(Math.min(count, 3)) : bdays ? '' : ' '}</span>
               </button>
             );
           })}
@@ -202,7 +202,7 @@ function Birthdays({ day, animals }: { day: string; animals: Row[] }) {
   if (!list.length) return null;
   return (
     <section className="card tight" style={{ borderColor: '#F9C6E0', background: '#FFF5FA' }}>
-      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 Birthdays · {longDate(day)}</h2>
+      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 {list.length > 1 ? `${list.length} birthdays` : 'Birthday'} · {longDate(day)}</h2>
       {list.map(({ a, turns }) => (
         <Link key={a.id} to={`/records/${a.id}`} className="row" style={{ textDecoration: 'none', color: 'inherit', alignItems: 'center' }}>
           <span className="chip" style={{ background: '#FCE7F3', color: '#9D174D' }}>Birthday</span>

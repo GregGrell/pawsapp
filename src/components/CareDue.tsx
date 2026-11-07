@@ -60,7 +60,7 @@ export function BirthdaysToday() {
   if (!list.length) return null;
   return (
     <section className="card tight" style={{ borderColor: '#F9C6E0', background: '#FFF5FA' }} aria-label="Birthdays today">
-      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 Birthday{list.length > 1 ? 's' : ''} today</h2>
+      <h2 className="h" style={{ paddingBottom: 6, color: '#9D174D' }}>🎂 {list.length > 1 ? `${list.length} birthdays today` : 'Birthday today'}</h2>
       {list.map(({ a, turns }) => (
         <Link key={a.id} to={`/records/${a.id}`} className="row" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="grow">
