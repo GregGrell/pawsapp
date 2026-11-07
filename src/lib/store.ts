@@ -56,6 +56,18 @@ export function getState() {
 }
 
 // ---------- what we load ----------
+/** The server returns at most 1,000 rows per request, so fetch big tables page by page. */
+function paged(make: () => any): () => Promise<{ data: any; error: any }> {
+  return async () => {
+    const out: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await make().order('id').range(from, from + 999);
+      if (error) return { data: null, error };
+      out.push(...(data ?? []));
+      if (!data || data.length < 1000) return { data: out, error: null };
+    }
+  };
+}
 function queries(userId: string, isMgmt: boolean, role = '') {
   const d = today();
   const since30 = addDays(d, -30);
@@ -64,17 +76,17 @@ function queries(userId: string, isMgmt: boolean, role = '') {
     profiles: () => supabase.from('profiles').select('*').order('full_name'),
     app_settings: () => supabase.from('app_settings').select('*'),
     kennels: () => supabase.from('kennels').select('*').order('species').order('sort'),
-    animals: () => supabase.from('animals').select('*').order('name'),
-    medications: () => supabase.from('medications_in_care').select('*'),
-    animal_locations: () => supabase.from('animal_locations').select('*').order('from_on'),
-    treatments: () => supabase.from('treatments_in_care').select('*').order('given_on'),
+    animals: paged(() => supabase.from('animals').select('*').order('name')),
+    medications: paged(() => supabase.from('medications_in_care').select('*')),
+    animal_locations: paged(() => supabase.from('animal_locations').select('*').order('from_on')),
+    treatments: paged(() => supabase.from('treatments_in_care').select('*').order('given_on')),
     treatment_types: () => supabase.from('treatment_types').select('*').order('sort'),
-    medical_notes: () => supabase.from('medical_notes_in_care').select('*').order('noted_on'),
-    animal_files: () => supabase.from('animal_files').select('*').order('created_at'),
+    medical_notes: paged(() => supabase.from('medical_notes_in_care').select('*').order('noted_on')),
+    animal_files: paged(() => supabase.from('animal_files').select('*').order('created_at')),
     flight_lists: () => supabase.from('flight_lists').select('*').order('created_at'),
-    animal_weights: () => supabase.from('animal_weights').select('*').order('weighed_on'),
-    microchip_checks: () => supabase.from('microchip_checks').select('*').order('checked_on'),
-    contacts: () => supabase.from('contacts').select('*').order('full_name'),
+    animal_weights: paged(() => supabase.from('animal_weights').select('*').order('weighed_on')),
+    microchip_checks: paged(() => supabase.from('microchip_checks').select('*').order('checked_on')),
+    contacts: paged(() => supabase.from('contacts').select('*').order('full_name')),
     kennel_logs: () => supabase.from('kennel_logs').select('*').gte('created_at', `${since7}T00:00:00+03:00`).order('created_at'),
     calendar_items: () => supabase.from('calendar_items').select('*').eq('active', true),
     task_completions: () => supabase.from('task_completions').select('*').gte('occurs_on', since30),
@@ -83,7 +95,7 @@ function queries(userId: string, isMgmt: boolean, role = '') {
     request_replies: () => supabase.from('request_replies').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at'),
     animal_movements: () => supabase.from('animal_movements').select('*').or(`returned_at.is.null,out_at.gte.${since30}T00:00:00+03:00`).order('out_at'),
     out_of_hours: () => supabase.from('out_of_hours').select('*').order('work_on'),
-    site_presence: () => supabase.from('site_presence').select('*').gte('at', `${addDays(d, -63)}T00:00:00+03:00`).order('at'),
+    site_presence: paged(() => supabase.from('site_presence').select('*').gte('at', `${addDays(d, -63)}T00:00:00+03:00`).order('at')),
     maintenance_issues: () => supabase.from('maintenance_issues').select('*').or(`status.neq.fixed,updated_at.gte.${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     incidents: () => supabase.from('incidents').select('*').gte('created_at', `${since30}T00:00:00+03:00`).order('created_at', { ascending: false }),
     leave_requests: () => supabase.from('leave_requests').select('*').gte('end_on', addDays(d, -90)).order('start_on'),
@@ -94,7 +106,7 @@ function queries(userId: string, isMgmt: boolean, role = '') {
     eod_checklist_items: () => supabase.from('eod_checklist_items').select('*').eq('active', true).order('sort'),
     eod_signoffs: () => supabase.from('eod_signoffs').select('*').gte('work_on', since30),
     petty_cash_issues: () => supabase.from('petty_cash_issues').select('*').order('created_at'),
-    petty_cash_spends: () => supabase.from('petty_cash_spends').select('*').order('created_at'),
+    petty_cash_spends: paged(() => supabase.from('petty_cash_spends').select('*').order('created_at')),
     cash_donations: () => supabase.from('cash_donations').select('*').order('created_at'),
     donation_transfers: () => (isMgmt ? supabase.from('donation_transfers').select('*').order('created_at') : Promise.resolve({ data: [], error: null })),
   };
