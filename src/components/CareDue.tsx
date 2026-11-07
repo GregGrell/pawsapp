@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth';
-import { birthdaysOn, careDue, type Due } from '../lib/animals';
+import { STATUS, birthdaysOn, careDue, type Due } from '../lib/animals';
 import { useTable } from '../lib/hooks';
 import { insert } from '../lib/store';
 import { addDays, shortDate, today } from '../lib/time';
@@ -65,7 +65,7 @@ export function BirthdaysToday() {
         <Link key={a.id} to={`/records/${a.id}`} className="row" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="grow">
             <span className="t15">{a.name} turns {turns}{a.dob_estimated ? ' (estimated)' : ''}</span>
-            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''} · tap for photos</span>
+            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''}{a.status !== 'shelter' ? ` · ${STATUS[a.status]?.label ?? a.status}` : ''} · tap for photos</span>
           </div>
         </Link>
       ))}

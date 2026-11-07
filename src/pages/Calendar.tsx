@@ -6,7 +6,7 @@ import { Empty, Icon, Page, StoredImages, toast } from '../components/ui';
 import { CATEGORIES, catStyle, hm, itemsOn, useProfiles, useTable } from '../lib/hooks';
 import { insert, update, type Row } from '../lib/store';
 import { Link } from 'react-router-dom';
-import { birthdaysOn } from '../lib/animals';
+import { STATUS, birthdaysOn } from '../lib/animals';
 import { addDays, dayLabel, longDate, minusMinutes, monthLabel, nowHM, today, weekday } from '../lib/time';
 
 export default function Calendar() {
@@ -208,7 +208,7 @@ function Birthdays({ day, animals }: { day: string; animals: Row[] }) {
           <span className="chip" style={{ background: '#FCE7F3', color: '#9D174D' }}>Birthday</span>
           <div className="grow">
             <span className="t15">{a.name} turns {turns}{a.dob_estimated ? ' (estimated)' : ''}</span>
-            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''}{a.status !== 'shelter' ? ` · ${a.status === 'foster' ? 'at foster' : 'on trial'}` : ''}</span>
+            <span className="t13">{a.species === 'dog' ? 'Dog' : 'Cat'}{a.breed ? ` · ${a.breed}` : ''}{a.status !== 'shelter' ? ` · ${STATUS[a.status]?.label ?? a.status}` : ''}</span>
           </div>
         </Link>
       ))}
