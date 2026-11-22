@@ -379,6 +379,8 @@ export async function write(b: Built, me: string, progress: (msg: string) => voi
   await inChunks(b.contacts, 500, (c) => insertNew('contacts', c.map((x) => ({ ...x, created_by: me }))), (n) => progress(`People: ${n} / ${b.contacts.length}`));
   const contactIds = await ids('contacts', b.contacts.map((c) => c.sl_key));
 
+  // remember which animals are already here: only brand-new ones get their status set from this upload
+  const existing = await ids('animals', b.animals.map((a) => a.sl_key));
   progress(`Animals: 0 / ${b.animals.length}`);
   await inChunks(b.animals, 300, (c) => insertNew('animals', c.map((a) => ({ ...strip(a, ['final_status']), status: 'other', in_shelter: false, created_by: me, updated_at: new Date().toISOString() }))), (n) => progress(`Animals: ${n} / ${b.animals.length}`));
   const animalIds = await ids('animals', b.animals.map((a) => a.sl_key));
@@ -394,7 +396,21 @@ export async function write(b: Built, me: string, progress: (msg: string) => voi
   progress(`Vaccinations, tests & treatments: 0 / ${tr.length}`);
   await inChunks(tr, 500, (c) => insertNew('treatments', c), (n) => progress(`Vaccinations, tests & treatments: ${n} / ${tr.length}`));
 
-  const meds = b.medications.filter((m) => A(m.animal)).map((m) => ({ ...strip(m, ['animal']), animal_id: A(m.animal), created_by: me }));
+  let meds: Rec[] = b.medications.filter((m) => A(m.animal)).map((m) => ({ ...strip(m, ['animal']), animal_id: A(m.animal), created_by: me }));
+  // a course that carries on from an earlier upload extends that course instead of starting a second one
+  const medAnimals = [...new Set(meds.map((m) => m.animal_id))];
+  const prior: Rec[] = [];
+  for (let i = 0; i < medAnimals.length; i += 150) {
+    const { data } = await supabase.from('medications').select('id, animal_id, name, started_on, ended_on, sl_key').in('animal_id', medAnimals.slice(i, i + 150)).not('sl_key', 'is', null);
+    prior.push(...(data ?? []));
+  }
+  const newKeys = new Set(meds.map((m) => m.sl_key));
+  meds = meds.filter((m) => {
+    const p = prior.find((x) => !newKeys.has(x.sl_key) && x.animal_id === m.animal_id && x.name === m.name && x.ended_on && x.ended_on < m.started_on && addDays(x.ended_on, 7) >= m.started_on);
+    if (!p) return true;
+    supabase.from('medications').update({ ended_on: m.ended_on > p.ended_on ? m.ended_on : p.ended_on }).eq('id', p.id).then(() => {});
+    return false;
+  });
   progress(`Medication history: 0 / ${meds.length}`);
   await inChunks(meds, 500, (c) => insertNew('medications', c), (n) => progress(`Medication history: ${n} / ${meds.length}`));
 
@@ -414,7 +430,7 @@ export async function write(b: Built, me: string, progress: (msg: string) => voi
   // Current status straight from Shelterluv, for animals nobody has edited in PAWSapp yet
   progress('Setting where each animal is now…');
   const groups = new Map<string, string[]>();
-  for (const a of b.animals) { const id = A(a.sl_key); if (id) groups.set(a.final_status, [...(groups.get(a.final_status) ?? []), id]); }
+  for (const a of b.animals) { const id = A(a.sl_key); if (id && !existing.has(a.sl_key)) groups.set(a.final_status, [...(groups.get(a.final_status) ?? []), id]); }
   // skip animals someone has already moved in PAWSapp (they have a location entry that didn't come from Shelterluv)
   const moved = new Set<string>();
   const allIds = [...animalIds.values()];
