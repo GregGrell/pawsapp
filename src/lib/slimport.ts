@@ -408,7 +408,7 @@ export async function write(b: Built, me: string, progress: (msg: string) => voi
   }
   const newKeys = new Set(meds.map((m) => m.sl_key));
   meds = meds.filter((m) => {
-    const p = prior.find((x) => !newKeys.has(x.sl_key) && x.animal_id === m.animal_id && x.name === m.name && x.ended_on && x.ended_on < m.started_on && addDays(x.ended_on, 7) >= m.started_on);
+    const p = prior.find((x) => !newKeys.has(x.sl_key) && x.animal_id === m.animal_id && x.name === m.name && x.ended_on && x.started_on < m.started_on && addDays(x.ended_on, 7) >= m.started_on);
     if (!p) return true;
     supabase.from('medications').update({ ended_on: m.ended_on > p.ended_on ? m.ended_on : p.ended_on }).eq('id', p.id).then(() => {});
     return false;
