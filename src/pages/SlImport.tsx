@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth';
 import { Empty, Page, toast } from '../components/ui';
 import { useTable } from '../lib/hooks';
@@ -23,9 +23,25 @@ export default function SlImport() {
   const [done, setDone] = useState(false);
   const [err, setErr] = useState('');
 
+  // Reports can be handed over straight from a Shelterluv tab (window.postMessage), so the weekly top-up
+  // needs no downloads. Only messages from Shelterluv itself are accepted, and only for management.
+  const pickRef = useRef<(f: File[]) => void>(() => {});
+  useEffect(() => {
+    if (!isMgmt) return;
+    window.name = 'paws-sl-import';
+    const on = (e: MessageEvent) => {
+      if (!/^https:\/\/(new|www)\.shelterluv\.com$/.test(e.origin) || e.data?.type !== 'paws-sl-files') return;
+      const files = (e.data.files ?? []).filter((f: any) => f?.blob instanceof Blob).map((f: any) => new File([f.blob], String(f.name || 'report.xlsx')));
+      if (files.length) pickRef.current(files);
+      (e.source as Window | null)?.postMessage({ type: 'paws-sl-received', count: files.length }, e.origin);
+    };
+    window.addEventListener('message', on);
+    return () => window.removeEventListener('message', on);
+  }, [isMgmt]);
+
   if (!isMgmt) return <Page title="Import from Shelterluv" back="More"><Empty>Management only.</Empty></Page>;
 
-  const pick = async (files: FileList | null) => {
+  const pick = async (files: FileList | File[] | null) => {
     if (!files?.length) return;
     setErr(''); setDone(false); setLog([]); setBusy('Reading files…');
     try {
@@ -38,6 +54,7 @@ export default function SlImport() {
     setBusy('');
   };
 
+  pickRef.current = (f) => { pick(f); };
   const run = async () => {
     if (!built) return;
     setErr(''); setLog([]);
