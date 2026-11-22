@@ -50,6 +50,8 @@ export const clean = (r: Rec) => {
 const s = (v: any) => (v == null ? '' : String(v).trim());
 /** Shelterluv dates are MM/DD/YYYY. */
 export function d(v: any): string | null {
+  // some exports store dates as Excel day numbers (e.g. 46325 = 30 Oct 2026)
+  if (/^\d{5}(\.\d+)?$/.test(s(v))) return new Date(Math.round((Number(v) - 25569) * 86400_000)).toISOString().slice(0, 10);
   const m = s(v).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!m) return null;
   return `${m[3]}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`;

@@ -157,7 +157,7 @@ export function ShelterluvPanel() {
           <button className="btn sm" disabled={!!busy || !navigator.onLine} onClick={sync}>{busy || 'Sync now'}</button>
         </div>
       </div>
-      <span className="t13">Every hour, new and changed animals, moves (intake, foster, adoption, transfer), vaccines and photos come across from Shelterluv. Nothing edited in PAWSapp is overwritten; blanks are filled in.</span>
+      <span className="t13">Every 15 minutes, new and changed animals, moves (intake, foster, adoption, transfer), vaccines and photos come across from Shelterluv. Nothing edited in PAWSapp is overwritten; blanks are filled in.</span>
       {probe && <span className="ok">Key works · Shelterluv has {probe.animals ?? '?'} animals, {probe.events ?? '?'} events, {probe.vaccines ?? '?'} vaccines</span>}
       {!last && <span className="t14">Not synced yet.</span>}
       {last && !last.ok && <span className="bad">Last sync failed ({when}): {last.error}</span>}
