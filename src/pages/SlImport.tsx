@@ -4,6 +4,7 @@ import { Empty, Page, toast } from '../components/ui';
 import { useTable } from '../lib/hooks';
 import { build, readFiles, write, type Built, type Parsed } from '../lib/slimport';
 import { refresh } from '../lib/store';
+import { ShelterluvPanel } from './Kennels';
 
 const LABEL: Record<string, string> = {
   animals: 'Animals', people: 'People', intakes: 'Intakes', outcomes: 'Outcomes', foster_placements: 'Foster placements',
@@ -55,6 +56,9 @@ export default function SlImport() {
 
   return (
     <Page title="Import from Shelterluv" sub="Animals, people, history and medical records" back="More">
+      <ShelterluvPanel />
+      <h2 className="h" style={{ padding: '8px 4px 0' }}>Import from export files</h2>
+      <span className="t13" style={{ padding: '0 4px' }}>The API doesn't include people, tests, treatments, medication or medical notes. For those, use Shelterluv's custom-report exports here.</span>
       <section className="card">
         <span className="t14">Choose all the Shelterluv export files (.xlsx) at once. Nothing is saved until you press <b>Import</b>.</span>
         <span className="t13">You can run this again later with newer exports. Records already imported are recognised by their Shelterluv ID and left as they are, so edits made in PAWSapp are never overwritten.</span>

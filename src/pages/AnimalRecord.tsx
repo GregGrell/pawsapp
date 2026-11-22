@@ -733,7 +733,7 @@ function History({ a }: { a: Row }) {
         return (
           <div key={r.id} className="row" style={{ flexDirection: 'column', gap: 2 }}>
             <span className="t15">{what} {verb}</span>
-            <span className="t13">{shortDate(today(new Date(r.changed_at)))} {timeOf(r.changed_at)} · {r.changed_by ? name(r.changed_by) : 'System'}</span>
+            <span className="t13">{shortDate(today(new Date(r.changed_at)))} {timeOf(r.changed_at)} · {r.changed_by ? name(r.changed_by) : 'System / Shelterluv sync'}</span>
             {lines.map((l, i) => <span key={i} className="t13" style={{ color: 'var(--ink-2)' }}>{l}</span>)}
           </div>
         );

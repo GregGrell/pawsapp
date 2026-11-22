@@ -116,35 +116,56 @@ function AnimalList({ sp, animals, kennels }: { sp: Sp; animals: Row[]; kennels:
   );
 }
 
-function ShelterluvPanel() {
+/** Management: Shelterluv API sync status, "Test the key" and "Sync now". */
+export function ShelterluvPanel() {
   const settings = useTable('app_settings');
   const last = settings.find((x) => x.key === 'shelterluv_last_sync')?.value;
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [probe, setProbe] = useState<any>(null);
+  const call = async (body: object) => {
+    const { data, error } = await supabase.functions.invoke('shelterluv-sync', { body });
+    if (error) throw new Error('Couldn\'t reach the sync — check your signal');
+    if (!data?.ok) throw new Error(data?.error ?? 'Sync failed');
+    return data;
+  };
+  const test = async () => {
+    setBusy('Testing…'); setProbe(null);
+    try { setProbe(await call({ probe: true })); } catch (e: any) { toast(e.message); }
+    setBusy('');
+  };
   const sync = async () => {
-    setBusy(true);
-    const { data, error } = await supabase.functions.invoke('shelterluv-sync', { body: {} });
-    if (error) toast('Sync failed — check your signal');
-    else if (!data?.ok) toast(data?.error ?? 'Sync failed');
-    else toast(`Synced: ${data.added} added, ${data.updated} updated, ${data.left} left`);
-    await refresh(['animals', 'app_settings']).catch(() => {});
-    setBusy(false);
+    const tot = { animalsAdded: 0, animalsFilled: 0, moves: 0, vaccinesAdded: 0, vaccinesFilled: 0, weights: 0, photos: 0 } as Record<string, number>;
+    try {
+      for (let i = 1; i <= 20; i++) {
+        setBusy(i === 1 ? 'Syncing…' : `Still syncing (part ${i})…`);
+        const r = await call({});
+        for (const k of Object.keys(tot)) tot[k] += r[k] ?? 0;
+        if (!r.stillWorking) break;
+      }
+      toast(`Synced: ${tot.animalsAdded} new animals, ${tot.moves} moves, ${tot.vaccinesAdded} vaccines, ${tot.photos} photos`);
+    } catch (e: any) { toast(e.message); }
+    await refresh().catch(() => {});
+    setBusy('');
   };
   const when = last?.at ? `${shortDate(today(new Date(last.at)))} ${timeOf(last.at)}` : null;
   return (
     <section className="card">
       <div className="head">
-        <h2 className="h">Shelterluv</h2>
-        <button className="btn sm" disabled={busy || !navigator.onLine} onClick={sync}>{busy ? 'Syncing…' : 'Sync now'}</button>
+        <h2 className="h">Shelterluv sync</h2>
+        <div className="btns" style={{ flex: '0 0 auto' }}>
+          <button className="btn ghost sm" disabled={!!busy || !navigator.onLine} onClick={test}>Test the key</button>
+          <button className="btn sm" disabled={!!busy || !navigator.onLine} onClick={sync}>{busy || 'Sync now'}</button>
+        </div>
       </div>
-      {!last && <span className="t14">Not synced yet. Animals in custody sync automatically every night at 05:00.</span>}
+      <span className="t13">Every hour, new and changed animals, moves (intake, foster, adoption, transfer), vaccines and photos come across from Shelterluv. Nothing edited in PAWSapp is overwritten; blanks are filled in.</span>
+      {probe && <span className="ok">Key works · Shelterluv has {probe.animals ?? '?'} animals, {probe.events ?? '?'} events, {probe.vaccines ?? '?'} vaccines</span>}
+      {!last && <span className="t14">Not synced yet.</span>}
       {last && !last.ok && <span className="bad">Last sync failed ({when}): {last.error}</span>}
       {last?.ok && (
-        <>
-          <span className="t14">Last synced {when} · {last.inCustody} in custody · {last.added} added, {last.updated} updated, {last.left} left the shelter</span>
-          {last.unmatchedLocations?.length > 0 && (
-            <span className="warn">Shelterluv locations with no matching kennel here: {last.unmatchedLocations.join(', ')}. Name kennels to match (e.g. "D1") and they'll link automatically.</span>
-          )}
-        </>
+        <span className="t14">
+          Last synced {when} · {last.animalsAdded} new animals, {last.animalsFilled} filled in, {last.moves} moves, {last.vaccinesAdded} vaccines added, {last.vaccinesFilled} completed, {last.weights} weights, {last.photos} photos
+          {last.stillWorking ? ` · still catching up${last.photosLeft ? ` (${last.photosLeft} photos to go)` : ''}` : ''}
+        </span>
       )}
     </section>
   );
