@@ -13,12 +13,20 @@ const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers
 const BUDGET_MS = 105_000; // stop starting new work after this; the next run continues
 const STATE_KEY = 'shelterluv_sync_state';
 const RESULT_KEY = 'shelterluv_last_sync';
+// Moves before this date were already loaded from the export files, whose dates are in the Shelterluv account's
+// time zone (US Eastern) and so can sit a day apart from the API's. Only those older moves get the ±1 day matching.
+const EXPORT_CUTOFF = '2026-11-05';
+const PREFIX = 'PRUK-A-';
+/** The API gives the bare number ("10"); PAWSapp keeps Shelterluv's full Animal ID ("PRUK-A-10"). */
+const fullId = (id: string) => (/^\d+$/.test(id) ? `${PREFIX}${id}` : id);
 
 type Rec = Record<string, any>;
 const s = (v: unknown) => (v == null ? '' : String(v).trim());
-const qDate = (unix?: number | null) => (unix ? new Date((unix + 3 * 3600) * 1000).toISOString().slice(0, 10) : null);
-const strDate = (v?: string | null) => {
+const qDate = (unix?: number | string | null) => { const n = Number(unix); return n > 0 ? new Date((n + 3 * 3600) * 1000).toISOString().slice(0, 10) : null; };
+const strDate = (raw?: string | number | null) => {
+  const v = s(raw);
   if (!v) return null;
+  if (/^\d+$/.test(v)) return qDate(v);
   const t = Date.parse(v.includes('T') || v.includes('Z') ? v : v.replace(' ', 'T') + 'Z');
   return Number.isNaN(t) ? (/^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null) : qDate(Math.floor(t / 1000));
 };
@@ -73,11 +81,13 @@ function speciesOf(a: Rec): 'dog' | 'cat' | null {
 function statusFromAnimal(a: Rec): string {
   const st = s(a.Status).toLowerCase();
   if (a.InFoster === true || a.InFoster === 'true' || /foster/.test(st)) return 'foster';
-  if (/adopt/.test(st)) return 'adopted';
+  if (/travel/.test(st)) return 'foster';
+  if (/adopt(ed|ion)? ?$|in home/.test(st) && !/available/.test(st)) return 'adopted';
   if (/transfer/.test(st)) return 'transferred';
   if (/return/.test(st) && /owner/.test(st)) return 'returned';
   if (/(died|death|deceased|euthan)/.test(st)) return 'deceased';
-  if (/(available|custody|hold|intake|medical|pending|shelter)/.test(st)) return 'shelter';
+  if (/(lost|stolen|released|colony|wild)/.test(st)) return 'other';
+  if (/(available|custody|hold|intake|medical|pending|shelter|special)/.test(st)) return 'shelter';
   return 'other';
 }
 function eventStatus(type: string): string | null {
@@ -138,7 +148,7 @@ async function run(mode: 'run' | 'probe') {
       const adds: Rec[] = [], raws: Rec[] = [], weights: Rec[] = [];
       for (const a of list) {
         const sp = speciesOf(a);
-        const id = s(a.ID);
+        const id = fullId(s(a.ID));
         if (!sp || !id) continue;
         raws.push({ report: 'api_animal', sl_key: id, animal_sl_id: id, record_table: 'animals', record_sl_key: id, data: a });
         const chip = (a.Microchips ?? [])[0] ?? {};
@@ -200,8 +210,16 @@ async function run(mode: 'run' | 'probe') {
 
   // 2. Events → location history (intake, foster, back from foster, adoption, transfer…)
   if (timeLeft()) {
-    const contacts = new Map((await all('contacts', 'id, sl_key')).map((c) => [c.sl_key, c.id]));
-    const have = new Set((await all('animal_locations', 'id, animal_id, from_on, status')).map((l) => `${l.animal_id}|${l.from_on}|${l.status}`));
+    // Shelterluv's events name people by internal number; the people export links that number to our contact
+    const contacts = new Map((await all('contacts', 'id, sl_key, full_name')).map((c) => [c.sl_key, c]));
+    const people = new Map<string, Rec>();
+    for (const p of await all('sl_raw', 'id, sl_key, data', (q) => q.eq('report', 'people'))) {
+      const c = contacts.get(p.sl_key) ?? contacts.get(`P:${s(p.data['Person ID'])}`);
+      if (c && s(p.data['Internal ID (API)'])) people.set(s(p.data['Internal ID (API)']), c);
+    }
+    const locs = await all('animal_locations', 'id, animal_id, from_on, status');
+    const have = new Set(locs.map((l) => `${l.animal_id}|${l.from_on}|${l.status}`));
+    const outcomes = new Set(locs.filter((l) => ['adopted', 'transferred', 'returned', 'deceased', 'other'].includes(l.status)).map((l) => `${l.animal_id}|${l.from_on}`));
     st.events_run = st.events_offset != null ? st.events_run : now;
     const since = st.events_since ?? 0;
     for (let offset = st.events_offset ?? 0; timeLeft(); offset += 100) {
@@ -220,12 +238,16 @@ async function run(mode: 'run' | 'probe') {
           raws.push({ report: 'api_event', sl_key: k, animal_sl_id: an?.sl_key ?? s(r.Id), record_table: 'animal_locations', record_sl_key: k, data: e });
           if (!an || !status || !on) continue;
           const sig = `${an.id}|${on}|${status}`;
-          if (have.has(sig)) continue; // already in PAWSapp (from the exports or entered by hand)
+          const old = on < EXPORT_CUTOFF;
+          const near = (d: number) => `${an.id}|${addDays(on, d)}|${status}`;
+          if (have.has(sig) || (old && (have.has(near(-1)) || have.has(near(1))))) continue; // already in PAWSapp
+          // an old "back from foster" logged the day after an adoption/transfer is the same handover, not a new stay
+          if (old && status === 'shelter' && (outcomes.has(`${an.id}|${on}`) || outcomes.has(`${an.id}|${addDays(on, -1)}`))) continue;
           have.add(sig);
           const sub = s(e.Subtype);
           rows.push({
-            sl_key: k, animal_id: an.id, status, from_on: on, kennel_id: null,
-            contact_id: person ? contacts.get(`P:${s(person.Id)}`) ?? null : null, with_name: '', with_contact: '',
+            sl_key: k, animal_id: an.id, status, from_on: on, kennel_id: null, created_at: new Date(Number(e.Time) * 1000).toISOString(),
+            contact_id: person ? people.get(s(person.Id))?.id ?? null : null, with_name: ['shelter', 'deceased'].includes(status) ? '' : person ? people.get(s(person.Id))?.full_name ?? '' : '', with_contact: '',
             country: status === 'adopted' ? (/abroad/i.test(sub) ? 'Abroad' : 'Qatar') : /belgium/i.test(sub) ? 'Belgium' : '',
             note: [type.replace('.', ' · ').replace('Intake · FosterReturn', 'Back from foster'), sub, e.User ? `by ${s(e.User)}` : ''].filter(Boolean).join(' · ') + ' (Shelterluv)',
           });
@@ -240,13 +262,13 @@ async function run(mode: 'run' | 'probe') {
     await save();
   }
 
-  // 3. Vaccines (newest first): add missing ones, fill in manufacturer / batch / vet on ones we already have
-  if (timeLeft()) {
+  // 3. Vaccines: add missing ones, fill in manufacturer / batch / vet on ones we already have.
+  // Shelterluv doesn't sort or filter these by date, so read them all, at most once every 20 hours.
+  if (timeLeft() && (st.vaccines_offset != null || !st.vaccines_since || now - st.vaccines_since > 20 * 3600)) {
     const vacs = await all('treatments', 'id, animal_id, given_on, type_id, name, product, manufacturer, batch, vet, notes', (q) => q.eq('kind', 'vaccine'));
     const byDay = new Map<string, Rec[]>();
     for (const v of vacs) { const k = `${v.animal_id}|${v.given_on}`; byDay.set(k, [...(byDay.get(k) ?? []), v]); }
     st.vaccines_run = st.vaccines_offset != null ? st.vaccines_run : now;
-    const sinceDay = st.vaccines_since ? qDate(st.vaccines_since - 7 * 86400) : null; // a week's overlap for late entries
     let finished = false;
     for (let offset = st.vaccines_offset ?? 0; timeLeft(); offset += 100) {
       const page = await sl(`/vaccines?status=completed&limit=100&offset=${offset}`, key);
@@ -254,7 +276,6 @@ async function run(mode: 'run' | 'probe') {
       const adds: Rec[] = [], raws: Rec[] = [];
       for (const v of list) {
         const on = strDate(v.completed_at);
-        if (sinceDay && on && on < sinceDay) { finished = true; break; }
         const an = A.get(`#${s(v.animal_id)}`);
         raws.push({ report: 'api_vaccine', sl_key: `VACAPI:${v.id}`, animal_sl_id: an?.sl_key ?? null, record_table: 'treatments', record_sl_key: null, data: v });
         if (!an || !on) continue;
@@ -286,7 +307,7 @@ async function run(mode: 'run' | 'probe') {
       }
       if (adds.length) { await insertRows('treatments', adds); log.vaccinesAdded += adds.length; }
       await keepRaw('api_vaccine', raws);
-      if (finished || !page.has_more || !list.length) { finished = true; break; }
+      if (!page.has_more || !list.length) { finished = true; break; }
       st.vaccines_offset = offset + 100;
     }
     if (finished) { st.vaccines_offset = null; st.vaccines_since = st.vaccines_run; }
@@ -300,7 +321,7 @@ async function run(mode: 'run' | 'probe') {
     const have = new Set((await all('animal_files', 'id, path')).map((f) => f.path));
     const queue: { an: Rec; url: string; cover: boolean }[] = [];
     for (const r of rawAnimals ?? []) {
-      const an = A.get(r.sl_key);
+      const an = A.get(fullId(r.sl_key)) ?? A.get(`#${s(r.data['Internal-ID'])}`);
       if (!an || an.status === 'deceased') continue;
       const cover = s(r.data.CoverPhoto);
       const inCare = ['shelter', 'foster', 'trial'].includes(an.status);
